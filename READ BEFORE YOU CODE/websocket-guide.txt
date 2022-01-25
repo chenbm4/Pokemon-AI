@@ -1,0 +1,9 @@
+How to run websocket client:
+Open terminal
+Navigate to python-websockets (can right-click folder to open terminal in this directory)
+In terminal, enter command python ./client.py
+This will make the client listen to the server until process is manually terminated (Ctrl+C)
+
+To do:
+figure out how to send commands to server
+create list of relevant commands for our use

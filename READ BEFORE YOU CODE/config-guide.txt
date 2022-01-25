@@ -1,0 +1,5 @@
+1. Clone Pokemon-AI repository into IDE of your choice
+2. For best results, use the embedded terminal in your IDE
+3. Check if Python is installed (python --version). If not, if using Visual Studio Code, just type python in the terminal to download, otherwise download 3.10.2 here (https://www.python.org/).
+	After installing, doublecheck installation with python --version
+4. Download websockets with pip install websockets

@@ -1,0 +1,12 @@
+Do your best to follow the coding standards listed here:
+https://www.python.org/dev/peps/pep-0008/
+
+We don't have enough time to be too strict about coding standards, but it is worth it to 
+at least attempt to have a standard coding format for ease of use and legibility.
+
+Be sure to leave comments on functions if their purposes are not immediately obvious. We
+are not professionals and will need some clarification to understand what is going on in
+the code.
+
+Also, if any additional setup is required for you to complete your task, please update the
+config-guide.txt file to let others know. This will save time and make us more productive!

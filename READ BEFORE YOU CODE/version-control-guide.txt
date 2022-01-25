@@ -1,0 +1,16 @@
+Each user story should have its own branch
+Upon completion of user story, merge branch into main and remove unneeded branch
+
+Later, when minimum viable product is complete, we will split main into Master and Develop, so we can make changes without
+having to risk breaking our MVP, but that's a problem for another time
+
+Proper Workflow:
+Clone repository to your local machine
+When a change has been made, stage changes and create a pull request into the corresponding user story branch
+Write a short description on what you have changed for the pull request
+Changes should not be very large, if change requires too many lines, consider splitting task into multiple smaller tasks
+
+IMPORTANT
+Unless your changes are very simple (e.g. modifying the developer guide text files), please do not approve your own pull request.
+Try to get another member of the team to review it. This will allow us to peer review any changes to make sure there are no bugs 
+or inconsistencies being introduced into the code
