@@ -2,6 +2,8 @@
 import websockets
 import asyncio
 
+#config
+
 # connects and receives a message from the Showdown server
 async def listen():
     url = "ws://sim.smogon.com:8000/showdown/websocket"
