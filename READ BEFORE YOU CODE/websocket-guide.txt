@@ -1,5 +1,5 @@
 How to run websocket client:
 Open terminal
 Navigate to directory folder (can right-click folder to open terminal in this directory)
-In terminal, enter command python ./main.py
+In terminal, enter command "python ./main.py"
 This will start the client processes in main.py until process is manually terminated (Ctrl+C)
