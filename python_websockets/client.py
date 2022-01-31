@@ -30,7 +30,7 @@ class WebsocketClient:
     # receives and prints message from server
     async def listen(self):
         message = await self.websocket.recv()
-        print(message) # just printing debug messages for now, can move this to a dedicated debug log later
+        print("LOG:",message) # just printing debug messages for now, can move this to a dedicated debug log later
         return message
 
     # sends and prints message to server
@@ -89,3 +89,31 @@ class WebsocketClient:
         else:
             print.error("Could not log-in\nDetails:\n{}".format(response.content))
             raise LoginError("Could not log-in")
+    
+    # only works for gen8randombattle for now
+    # after running main.py, log onto pokemon showdown website and challenge bot using default settings
+    async def accept_challenge(self, battle_format, team, room_name, botname):
+        if room_name is not None:
+            await self.join_room(room_name)
+
+        # logger.debug("Waiting for a {} challenge".format(battle_format))
+       
+        # await self.update_team(team) //might need  this for later
+        username = None
+        # msg = await self.listen()
+        while username is None:
+            print("Waiting for challenge")
+            msg = await self.listen()
+            split_msg = msg.split('|')
+            if (
+                len(split_msg) == 9 and
+                split_msg[1] == "pm" and
+                split_msg[3].strip() == "!" + botname and 
+                split_msg[4].startswith("/challenge") and
+                split_msg[5] == 'gen8randombattle'
+            ):
+                username = split_msg[2].strip()
+
+        message = ["/accept " + username]
+        await self.send('', message)
+        return False
