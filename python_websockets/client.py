@@ -18,10 +18,10 @@ class WebsocketClient:
 
     # create function creates an instance of a Websocket Client with default values
     @classmethod    # this command makes the next function bound to the class rather than a object instance
-    async def create(cls, username, password):
+    async def create(cls):
         self = WebsocketClient()
-        self.username = username
-        self.password = password
+        self.username = input("Username:")
+        self.password = input("Password:")
         self.address = "ws://sim.smogon.com:8000/showdown/websocket"
         self.websocket = await websockets.connect(self.address)
         self.login_uri = "https://play.pokemonshowdown.com/action.php"
