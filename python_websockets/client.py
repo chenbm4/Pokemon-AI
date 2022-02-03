@@ -3,6 +3,7 @@ import websockets
 import asyncio
 import requests
 import json
+from configparser import ConfigParser
 
 class LoginError(Exception):
     pass
@@ -18,13 +19,17 @@ class WebsocketClient:
 
     # create function creates an instance of a Websocket Client with default values
     @classmethod    # this command makes the next function bound to the class rather than a object instance
-    async def create(cls, username, password):
+    async def create(cls):
         self = WebsocketClient()
-        self.username = username
-        self.password = password
-        self.address = "ws://sim.smogon.com:8000/showdown/websocket"
+        config_object = ConfigParser()
+        config_object.read("config.ini")
+        userinfo = config_object["USERINFO"]
+        self.username = userinfo["username"]
+        self.password = userinfo["password"]
+        serverinfo = config_object["SERVERCONFIG"]
+        self.address = serverinfo["address"]
         self.websocket = await websockets.connect(self.address)
-        self.login_uri = "https://play.pokemonshowdown.com/action.php"
+        self.login_uri = serverinfo["host"]
         return self
 
     # receives and prints message from server
