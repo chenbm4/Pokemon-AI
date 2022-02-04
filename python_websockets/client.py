@@ -101,6 +101,9 @@ class WebsocketClient:
     # only works for gen8randombattle for now
     # after running main.py, log onto pokemon showdown website and challenge bot using default settings
     async def accept_challenge(self, battle_format, team, room_name):
+        # moved from main
+        msg = await self.listen()
+
         if(self.acceptingChallenges):
             if room_name is not None:
                 await self.join_room(room_name)
@@ -136,3 +139,29 @@ class WebsocketClient:
         message = ["/challenge {},{}".format(user_to_challenge, battle_format)]
         await self.send_message('', message)
         self.last_challenge_time = time.time()"""
+    
+    async def get_battle_tag(self):
+        while True:
+            msg = await self.listen()
+            split_msg = msg.split('|')
+            first_msg = split_msg[0]
+            if 'battle' in first_msg:
+                battle_tag = first_msg.replace('>', '').strip()
+                return battle_tag
+    
+    async def take_turn(self, battle_tag):
+        while True:
+            msg = await self.listen()
+            if "|turn" in msg:    
+                move = "default"
+                send_message = ["/choose " + move]
+                await self.send(battle_tag, send_message)
+            elif "|win" in msg or "|tie" in msg:
+                return True
+    
+    async def battle(self):
+        battle_tag = await self.get_battle_tag()
+        while True:
+            game_over = await self.take_turn(battle_tag)
+            if game_over:
+                return
