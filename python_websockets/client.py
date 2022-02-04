@@ -1,4 +1,4 @@
-
+import time
 import websockets
 import asyncio
 import requests
@@ -16,6 +16,9 @@ class WebsocketClient:
     username = None
     password = None
     last_message = None
+
+    #challenge flags
+    acceptingChallenges = True
 
     # create function creates an instance of a Websocket Client with default values
     @classmethod    # this command makes the next function bound to the class rather than a object instance
@@ -97,28 +100,39 @@ class WebsocketClient:
     
     # only works for gen8randombattle for now
     # after running main.py, log onto pokemon showdown website and challenge bot using default settings
-    async def accept_challenge(self, battle_format, team, room_name, botname):
-        if room_name is not None:
-            await self.join_room(room_name)
+    async def accept_challenge(self, battle_format, team, room_name):
+        if(self.acceptingChallenges):
+            if room_name is not None:
+                await self.join_room(room_name)
 
-        # logger.debug("Waiting for a {} challenge".format(battle_format))
-       
-        # await self.update_team(team) //might need  this for later
-        username = None
-        # msg = await self.listen()
-        while username is None:
-            print("Waiting for challenge")
-            msg = await self.listen()
-            split_msg = msg.split('|')
-            if (
-                len(split_msg) == 9 and
-                split_msg[1] == "pm" and
-                split_msg[3].strip() == "!" + botname and 
-                split_msg[4].startswith("/challenge") and
-                split_msg[5] == 'gen8randombattle'
-            ):
-                username = split_msg[2].strip()
+            # logger.debug("Waiting for a {} challenge".format(battle_format))
+        
+            # await self.update_team(team) //might need  this for later
+            username = None
+            # msg = await self.listen()
+            while username is None:
+                print("Waiting for challenge")
+                msg = await self.listen()
+                split_msg = msg.split('|')
+                if (
+                    len(split_msg) == 9 and
+                    split_msg[1] == "pm" and
+                    split_msg[3].strip() == "!" + self.username and 
+                    split_msg[4].startswith("/challenge") and
+                    split_msg[5] == battle_format
+                ):
+                    username = split_msg[2].strip()
 
-        message = ["/accept " + username]
-        await self.send('', message)
-        return False
+            message = ["/accept " + username]
+            await self.send('', message)
+            self.acceptingChallenges = False
+
+    """async def challenge_user(self, user_to_challenge, battle_format, team):
+        # logger.debug("Challenging {}...".format(user_to_challenge))
+        if time.time() - self.last_challenge_time < 10:
+            logger.info("Sleeping for 10 seconds because last challenge was less than 10 seconds ago")
+            await asyncio.sleep(10)
+        await self.update_team(team)
+        message = ["/challenge {},{}".format(user_to_challenge, battle_format)]
+        await self.send_message('', message)
+        self.last_challenge_time = time.time()"""
