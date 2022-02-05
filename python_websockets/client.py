@@ -17,8 +17,11 @@ class WebsocketClient:
     password = None
     last_message = None
 
-    #challenge flags
+    #challenge variables
     acceptingChallenges = True
+    battle_format = None
+    user_to_challenge = None
+    room_name = None
 
     # create function creates an instance of a Websocket Client with default values
     @classmethod    # this command makes the next function bound to the class rather than a object instance
@@ -29,10 +32,15 @@ class WebsocketClient:
         userinfo = config_object["USERINFO"]
         self.username = userinfo["username"]
         self.password = userinfo["password"]
+        #challenge variables
+        self.battle_format = userinfo["battle_format"]
+        self.user_to_challenge = userinfo["user_to_challenge"]
+
         serverinfo = config_object["SERVERCONFIG"]
         self.address = serverinfo["address"]
         self.websocket = await websockets.connect(self.address)
         self.login_uri = serverinfo["host"]
+
         return self
 
     # receives and prints message from server
@@ -100,29 +108,29 @@ class WebsocketClient:
     
     # only works for gen8randombattle for now
     # after running main.py, log onto pokemon showdown website and challenge bot using default settings
-    async def accept_challenge(self, battle_format, team, room_name):
-        # moved from main
-        msg = await self.listen()
-
+    async def accept_challenge(self):
         if(self.acceptingChallenges):
-            if room_name is not None:
-                await self.join_room(room_name)
-
+            
+            # These lines are from example project, and does nothing right now so it is commented out
+            #if self.room_name is not None:
+            #    await self.join_room(self.room_name)
             # logger.debug("Waiting for a {} challenge".format(battle_format))
-        
-            # await self.update_team(team) //might need  this for later
+            # await self.update_team(team) 
+
             username = None
             # msg = await self.listen()
             while username is None:
                 print("Waiting for challenge")
                 msg = await self.listen()
                 split_msg = msg.split('|')
+
+                #look for challenge and save user who sent challenge
                 if (
                     len(split_msg) == 9 and
                     split_msg[1] == "pm" and
-                    split_msg[3].strip() == "!" + self.username and 
+                    split_msg[3].strip() == "!" + self.username and
                     split_msg[4].startswith("/challenge") and
-                    split_msg[5] == battle_format
+                    split_msg[5] == self.battle_format
                 ):
                     username = split_msg[2].strip()
 

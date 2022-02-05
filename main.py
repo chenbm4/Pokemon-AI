@@ -1,8 +1,5 @@
 import asyncio
 
-# import constants
-import config
-
 from python_websockets.client import WebsocketClient
 from states import State
  
@@ -17,7 +14,7 @@ async def pokemon_ai(): # move username and password to config file later
         
         #wait for challenge to be sent to the bot from pokemon showdown
         if (state == State.AWAITING_CHALLENGE):
-            await websocket_client.accept_challenge(config.pokemon_mode, None, config.room_name)
+            await websocket_client.accept_challenge()
             state = State.BATTLE
 
         if (state == State.BATTLE):
