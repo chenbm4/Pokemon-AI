@@ -3,6 +3,7 @@ import websockets
 import asyncio
 import requests
 import json
+import time
 from configparser import ConfigParser
 
 class LoginError(Exception):
@@ -16,6 +17,7 @@ class WebsocketClient:
     username = None
     password = None
     last_message = None
+    timestr = '19700101'
 
     #challenge variables
     acceptingChallenges = True
@@ -46,7 +48,10 @@ class WebsocketClient:
     # receives and prints message from server
     async def listen(self):
         message = await self.websocket.recv()
-        print("LOG:",message) # just printing debug messages for now, can move this to a dedicated debug log later
+        self.timestr = time.strftime("%Y%m%d-%H%M")
+        with open('debug ' + self.timestr + '.txt', 'a') as f:
+            f.write(message + '\n\n')  # create log for debugging
+        # print(message) # just printing debug messages for now, can move this to a dedicated debug log later
         return message
 
     # sends and prints message to server
@@ -54,6 +59,8 @@ class WebsocketClient:
         # client -> server message protocol: ROOMID|TEXT
         # more details here: https://github.com/smogon/pokemon-showdown/blob/master/PROTOCOL.md
         formatted_message = room_id + "|" + "|".join(messages)
+        # with open('server massage ' + self.timestr + '.txt', 'a') as f:
+        #     f.write(formatted_message + '\n\n')
         print(formatted_message)
         await self.websocket.send(formatted_message)
         self.last_message = formatted_message
