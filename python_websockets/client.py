@@ -158,6 +158,7 @@ class WebsocketClient:
                 return battle_tag
     
     async def take_turn(self, battle_tag):
+        next_pokemon = 2
         while True:
             msg = await self.listen()
             if "|turn" in msg:    
@@ -166,6 +167,12 @@ class WebsocketClient:
                 await self.send(battle_tag, send_message)
             elif "|win" in msg or "|tie" in msg:
                 return True
+            elif "|faint|p2" in msg:
+                switch_target = next_pokemon
+                next_pokemon += 1
+                send_message = ["/switch " + str(switch_target)]
+                await self.send(battle_tag, send_message)
+
     
     async def battle(self):
         battle_tag = await self.get_battle_tag()
