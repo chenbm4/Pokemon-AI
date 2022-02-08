@@ -1,4 +1,4 @@
-
+import time
 import websockets
 import asyncio
 import requests
@@ -19,6 +19,12 @@ class WebsocketClient:
     last_message = None
     timestr = '19700101'
 
+    #challenge variables
+    acceptingChallenges = True
+    battle_format = None
+    user_to_challenge = None
+    room_name = None
+
     # create function creates an instance of a Websocket Client with default values
     @classmethod    # this command makes the next function bound to the class rather than a object instance
     async def create(cls):
@@ -28,10 +34,15 @@ class WebsocketClient:
         userinfo = config_object["USERINFO"]
         self.username = userinfo["username"]
         self.password = userinfo["password"]
+        #challenge variables
+        self.battle_format = userinfo["battle_format"]
+        self.user_to_challenge = userinfo["user_to_challenge"]
+
         serverinfo = config_object["SERVERCONFIG"]
         self.address = serverinfo["address"]
         self.websocket = await websockets.connect(self.address)
         self.login_uri = serverinfo["host"]
+
         return self
 
     # receives and prints message from server
@@ -101,3 +112,78 @@ class WebsocketClient:
         else:
             print.error("Could not log-in\nDetails:\n{}".format(response.content))
             raise LoginError("Could not log-in")
+    
+    # only works for gen8randombattle for now
+    # after running main.py, log onto pokemon showdown website and challenge bot using default settings
+    async def accept_challenge(self):
+        if(self.acceptingChallenges):
+            
+            # These lines are from example project, and does nothing right now so it is commented out
+            #if self.room_name is not None:
+            #    await self.join_room(self.room_name)
+            # logger.debug("Waiting for a {} challenge".format(battle_format))
+            # await self.update_team(team) 
+
+            username = None
+            # msg = await self.listen()
+            while username is None:
+                print("Waiting for challenge")
+                msg = await self.listen()
+                split_msg = msg.split('|')
+
+                #look for challenge and save user who sent challenge
+                if (
+                    len(split_msg) == 9 and
+                    split_msg[1] == "pm" and
+                    split_msg[3].strip() == "!" + self.username and
+                    split_msg[4].startswith("/challenge") and
+                    split_msg[5] == self.battle_format
+                ):
+                    username = split_msg[2].strip()
+
+            message = ["/accept " + username]
+            await self.send('', message)
+            self.acceptingChallenges = False
+
+    """async def challenge_user(self, user_to_challenge, battle_format, team):
+        # logger.debug("Challenging {}...".format(user_to_challenge))
+        if time.time() - self.last_challenge_time < 10:
+            logger.info("Sleeping for 10 seconds because last challenge was less than 10 seconds ago")
+            await asyncio.sleep(10)
+        await self.update_team(team)
+        message = ["/challenge {},{}".format(user_to_challenge, battle_format)]
+        await self.send_message('', message)
+        self.last_challenge_time = time.time()"""
+    
+    async def get_battle_tag(self):
+        while True:
+            msg = await self.listen()
+            split_msg = msg.split('|')
+            first_msg = split_msg[0]
+            if 'battle' in first_msg:
+                battle_tag = first_msg.replace('>', '').strip()
+                return battle_tag
+    
+    async def take_turn(self, battle_tag):
+        next_pokemon = 2
+        while True:
+            msg = await self.listen()
+            if "|turn" in msg:    
+                move = "default"
+                send_message = ["/choose " + move]
+                await self.send(battle_tag, send_message)
+            elif "|win" in msg or "|tie" in msg:
+                return True
+            elif "|faint|p2" in msg:
+                switch_target = next_pokemon
+                next_pokemon += 1
+                send_message = ["/switch " + str(switch_target)]
+                await self.send(battle_tag, send_message)
+
+    
+    async def battle(self):
+        battle_tag = await self.get_battle_tag()
+        while True:
+            game_over = await self.take_turn(battle_tag)
+            if game_over:
+                return
