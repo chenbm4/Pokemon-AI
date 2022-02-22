@@ -3,12 +3,12 @@ import asyncio
 from poke_env.player_configuration import PlayerConfiguration
 from poke_env.server_configuration import ShowdownServerConfiguration
 
-from ImprovedBot import BetterMaxDamagePlayer
+from DamageCalculator import MaxDamagePlayer
 
 async def main():
     # We create a random player
     #logs in as user: 'CarterBattleBot'
-    player = BetterMaxDamagePlayer(
+    player = MaxDamagePlayer(
         player_configuration=PlayerConfiguration("CarterBattleBot", "PacifidlogTown"),
         battle_format="gen8randombattle",
         server_configuration=ShowdownServerConfiguration,
@@ -22,7 +22,7 @@ async def main():
     # send challenge to bot under 'find a user' button and type in bot's username
     print("Waiting for challenge")
     await player.accept_challenges(None, 1)
-
+    print("Battle finished")
     # Accepting three challenges from 'your_username'
     # await player.accept_challenges('your_username', 3)
 
@@ -31,8 +31,8 @@ async def main():
     # await player.ladder(5)
 
     # Print the rating of the player and its opponent after each battle
-    for battle in player.battles.values():
-        print(battle.rating, battle.opponent_rating)
+    #for battle in player.battles.values():
+    #    print(battle.rating, battle.opponent_rating)
 
     # terminates after all battles are finished
 

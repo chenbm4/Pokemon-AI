@@ -15,7 +15,7 @@ class BetterMaxDamagePlayer(Player):
             # movetype = move.type
             # multiplier: battle.opponent_active_pokemon.damage_multiplier(move.type)
             # Finds the best move among available ones
-            best_move = max(battle.available_moves, key=lambda move: move.base_power * battle.opponent_active_pokemon.damage_multiplier(move.type))s
+            best_move = max(battle.available_moves, key=lambda move: move.base_power * battle.opponent_active_pokemon.damage_multiplier(move.type))
             
             return self.create_order(best_move)
 
