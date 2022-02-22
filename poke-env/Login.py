@@ -34,21 +34,21 @@ def input_options(options):
 # TODO move account information somewhere else for security
 # could implement ini reading here
 def bot_selector():
+
     bot_options = (RandomPlayer, MaxDamagePlayer)
     bot_options_strings = ("RandomPlayer", "MaxDamagePlayer")
     bot_index = input_options(bot_options_strings)
     bot = bot_options[bot_index]
     
-    account_options = (("CarterBattleBot", "PacifidlogTown"), ("Random Bot", None))
-    account_options_strings = ("CarterBattleBot", "Random Bot")
+    account_options = (("CarterBattleBot", "PacifidlogTown"), ("115ABot", "plasma"))
+    account_options_strings = ("CarterBattleBot", "115ABot")
     account_index = input_options(account_options_strings)
     account = account_options[account_index]
 	
-    # TODO use os.listdir to get files in Teams folder, then run them through input_options
-    # currently untestable since no extant bots use teams
+    # currently irrelevant since no extant bots use teams
     team = None
     
-    bformat_options = ("gen8randombattle")
+    bformat_options = ("gen8randombattle",)
     bformat_options_strings = ("Gen 8 Random Battle",)
     bformat_index = input_options(bformat_options_strings)
     bformat = bformat_options[bformat_index]
@@ -72,7 +72,7 @@ async def main():
     
     # Sending challenges to 'your_username'
     # Not working on official pokemon showdown servers
-    # await player.send_challenges("TheMagnaCarta", n_challenges=1)
+    # await player.send_challenges("", n_challenges=1)
 
     # Accepting one challenge from any user
     # send challenge to bot under 'find a user' button and type in bot's username
