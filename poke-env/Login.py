@@ -3,23 +3,24 @@ import asyncio
 from poke_env.player_configuration import PlayerConfiguration
 from poke_env.server_configuration import ShowdownServerConfiguration
 
-from pokebot import MaxDamagePlayer
+from ImprovedBot import BetterMaxDamagePlayer
 
 async def main():
     # We create a random player
     #logs in as user: 'CarterBattleBot'
-    player = MaxDamagePlayer(
+    player = BetterMaxDamagePlayer(
         player_configuration=PlayerConfiguration("CarterBattleBot", "PacifidlogTown"),
         battle_format="gen8randombattle",
         server_configuration=ShowdownServerConfiguration,
     )
-    
+    print("Successfully Logged In")
     # Sending challenges to 'your_username'
     # Not working on official pokemon showdown servers
     # await player.send_challenges("TheMagnaCarta", n_challenges=1)
 
     # Accepting one challenge from any user
     # send challenge to bot under 'find a user' button and type in bot's username
+    print("Waiting for challenge")
     await player.accept_challenges(None, 1)
 
     # Accepting three challenges from 'your_username'
