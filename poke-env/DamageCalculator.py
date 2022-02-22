@@ -14,6 +14,7 @@ class MaxDamagePlayer(Player):
             best_move = battle.available_moves[0]
             best_move_dmg = 0
             
+            print("Available moves:", battle.available_moves)
             for move in battle.available_moves:
                 active = battle.active_pokemon
                 opponent = battle.opponent_active_pokemon
