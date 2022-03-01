@@ -3,8 +3,34 @@ import random
 
 from poke_env.player.player import Player
 
+#compares types of active pokemon
+def teampreview_performance(mon_a, mon_b):
+    # We evaluate the performance on mon_a against mon_b as its type advantage
+    a_on_b = b_on_a = -100
+    for type_ in mon_a.types:
+        if type_:
+            a_on_b = max(a_on_b, type_.damage_multiplier(*mon_b.types))
+    # We do the same for mon_b over mon_a
+    for type_ in mon_b.types:
+        if type_:
+            b_on_a = max(b_on_a, type_.damage_multiplier(*mon_a.types))
+    # Our performance metric is the different between the two
+    print("a b:", a_on_b, " b a: ", b_on_a)
+    return a_on_b - b_on_a
+
 class MaxDamagePlayer(Player):
+    
     def choose_move(self, battle):
+        #save current active pokemon
+        my_active = battle.active_pokemon
+        opponent_active = battle.opponent_active_pokemon
+
+        #calculate matchup
+        matchup = teampreview_performance(my_active, opponent_active)
+        #if matchup is bad, swap to next pokemon if possible
+        if(matchup < 0 and len(battle.available_switches) >= 1):
+            return self.create_order(battle.available_switches[0])
+
         # If the player can attack, it will
         if battle.available_moves:
             #initialize dmg calculator
@@ -16,16 +42,20 @@ class MaxDamagePlayer(Player):
             
             print("Available moves:", battle.available_moves)
             for move in battle.available_moves:
-                active = battle.active_pokemon
-                opponent = battle.opponent_active_pokemon
-                
                 #check for STAB bonus
                 stab = 1
-                if move.type in active.types:
+                if move.type in my_active.types:
                     stab = 1.5
                 
                 #calculate damage if move is used
-                dmgCalc.ResultDamage(active.level, move.base_power, active.stats['atk'], opponent.base_stats['def'], 1, stab, opponent.damage_multiplier(move.type), 1)
+                dmgCalc.ResultDamage(my_active.level, 
+                    move.base_power, 
+                    my_active.stats['atk'], 
+                    opponent_active.base_stats['def'], 
+                    1, 
+                    stab, 
+                    opponent_active.damage_multiplier(move.type), 
+                    1)
 
                 #if damage is higher, assign new best move
                 if(dmgCalc.NonCritResult > best_move_dmg):
@@ -69,8 +99,3 @@ class DamageCalculator:
         self.CritResult = base * Weather * randomMulti * STAB * Type * 1.5
         #self.minCrit = base * Target * Weather * 0.85 * STAB * Type * 1.5
         #self.maxCrit = base * Target * Weather * STAB * Type * 1.5
-
-
-
-
-        
