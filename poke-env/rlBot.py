@@ -102,12 +102,13 @@ dqn = DQNAgent(
 
 dqn.compile(Adam(learning_rate=0.001), metrics=["mae"])
 
-opponent = MaxDamagePlayer(battle_format="gen8randombattle")
+opponent = RandomPlayer(battle_format="gen8randombattle")
+second_opponent = MaxDamagePlayer(battle_format="gen8randombattle")
 
 # Training
 env_player.play_against(
     env_algorithm=dqn_training,
-    opponent=opponent,
+    opponent=second_opponent,
     env_algorithm_kwargs={"dqn": dqn, "nb_steps": 10000},
 )
 
@@ -120,10 +121,6 @@ def dqn_evaluation(player, dqn, nb_episodes):
         "DQN Evaluation: %d victories out of %d episodes"
         % (player.n_won_battles, nb_episodes)
     )
-
-# Ths code of MaxDamagePlayer is not reproduced for brevity and legibility
-# It can be found in the complete code linked above, or in the max damage example
-second_opponent = MaxDamagePlayer(battle_format="gen8randombattle")
 
 # Evaluation
 print("Results against random player:")
