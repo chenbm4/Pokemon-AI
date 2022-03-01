@@ -4,8 +4,7 @@ import os
 from poke_env.player_configuration import PlayerConfiguration
 from poke_env.server_configuration import ShowdownServerConfiguration
 
-from poke_env.player.random_player import RandomPlayer
-from pokebot import MaxDamagePlayer
+from DamageCalculator import MaxDamagePlayer
 
 
 # This is a simple helper function to handle user inputs forgivingly.
@@ -69,15 +68,16 @@ async def main():
         battle_format=selected[3],
         server_configuration=selected[4],
     )
-    
+    print("Successfully Logged In")
     # Sending challenges to 'your_username'
     # Not working on official pokemon showdown servers
     # await player.send_challenges("", n_challenges=1)
 
     # Accepting one challenge from any user
     # send challenge to bot under 'find a user' button and type in bot's username
+    print("Waiting for challenge")
     await player.accept_challenges(None, 1)
-
+    print("Battle finished")
     # Accepting three challenges from 'your_username'
     # await player.accept_challenges('your_username', 3)
 
@@ -86,8 +86,8 @@ async def main():
     # await player.ladder(5)
 
     # Print the rating of the player and its opponent after each battle
-    for battle in player.battles.values():
-        print(battle.rating, battle.opponent_rating)
+    #for battle in player.battles.values():
+    #    print(battle.rating, battle.opponent_rating)
 
     # terminates after all battles are finished
 
