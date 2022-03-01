@@ -100,15 +100,15 @@ dqn = DQNAgent(
     enable_double_dqn=True,
 )
 
-dqn.compile(Adam(learning_rate=0.00025), metrics=["mae"])
+dqn.compile(Adam(learning_rate=0.001), metrics=["mae"])
 
-opponent = RandomPlayer(battle_format="gen8randombattle")
+opponent = MaxDamagePlayer(battle_format="gen8randombattle")
 
 # Training
 env_player.play_against(
     env_algorithm=dqn_training,
     opponent=opponent,
-    env_algorithm_kwargs={"dqn": dqn, "nb_steps": 100000},
+    env_algorithm_kwargs={"dqn": dqn, "nb_steps": 10000},
 )
 
 def dqn_evaluation(player, dqn, nb_episodes):

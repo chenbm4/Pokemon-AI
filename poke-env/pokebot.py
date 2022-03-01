@@ -14,7 +14,7 @@ class MaxDamagePlayer(Player):
         if battle.available_moves:
             # Finds the best move among available ones
             best_move = max(battle.available_moves, key=lambda move: move.base_power)
-            print(battle.available_moves)
+            # print(battle.available_moves)
             return self.create_order(best_move)
 
         # If no attack is available, a random switch will be made
