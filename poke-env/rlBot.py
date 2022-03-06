@@ -1,20 +1,51 @@
 import numpy as np
+import os
+
+os.add_dll_directory("C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.6/bin")
+os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices'
 import tensorflow as tf
 
+from poke_env.player.player import Player
 from poke_env.player.env_player import Gen8EnvSinglePlayer
 
-from tensorflow.python.keras.layers import Dense, Flatten
-from tensorflow.python.keras.models import Sequential
+# from tensorflow.python.keras.layers import Dense, Flatten
+# from tensorflow.python.keras.models import Sequential
 
-from rl.agents.dqn import DQNAgent
-from rl.memory import SequentialMemory
-from rl.policy import LinearAnnealedPolicy, EpsGreedyQPolicy
+# from rl.agents.dqn import DQNAgent
+# from rl.memory import SequentialMemory
+# from rl.policy import LinearAnnealedPolicy, EpsGreedyQPolicy
+
+from gym.spaces import Box, Discrete
+
+# PPO dependencies
+import gym
+# from stable_baselines.common.policies import MlpPolicy
+# from stable_baselines.common import make_vec_env
+from stable_baselines3 import PPO
+# from stable_baselines3.common.vec_env import DummyVecEnv, VecNormalize
+# from stable_baselines3.common.callbacks import EvalCallback
+
 from tensorflow.keras.optimizers import Adam
 
 from poke_env.player.random_player import RandomPlayer
 from pokebot import MaxDamagePlayer
 
+NUM_TIMESTEPS = int(2e7)
+SEED = 721
+EVAL_FREQ = 250000
+EVAL_EPISODES = 1000
+LOGDIR = "ppo" # moved to zoo afterwards.
+
 class SimpleRLPlayer(Gen8EnvSinglePlayer):
+    observation_space = Box(low=-17, high=17, shape=(17,))
+    action_space = Discrete(22)
+
+    def getThisPlayer(self):
+        return self
+
+    def __init__(self, *args, **kwargs):
+        Gen8EnvSinglePlayer.__init__(self)
+
     def embed_battle(self, battle):
         # -1 indicates that the move does not have a base power
         # or is not available
@@ -37,125 +68,117 @@ class SimpleRLPlayer(Gen8EnvSinglePlayer):
         #active pokemon battle info
         active_stats = battle.active_pokemon.stats
         active_types = battle.active_pokemon.types
-        active_can_dyna = battle.can_dynamax
-        active_can_mega = battle.can_mega_evolve
-        active_can_z = battle.can_z_move
-        active_trapped = battle.trapped
+        if (battle.can_dynamax):
+            active_can_dyna = 1
+        else:
+            active_can_dyna = 0
+        if (battle.can_mega_evolve):
+            active_can_mega = 1
+        else:
+            active_can_mega = 0
+        if (battle.can_z_move):
+            active_can_z = 1
+        else:
+            active_can_z = 0
+        if (battle.trapped):
+            active_trapped = 1
+        else:
+            active_trapped = 0
 
         #opponent pokemon battle info
         opponent_active_stats = battle.opponent_active_pokemon.base_stats
-        opponent_types = battle.oppoenent_active_pokemon.types
+        opponent_types = battle.opponent_active_pokemon.types
         opponent_can_dyna = battle.opponent_can_dynamax
         opponent_can_mega = battle.opponent_can_mega_evolve
         opponent_can_z = battle.opponent_can_z_move
+        if (battle.opponent_can_dynamax):
+            opponent_can_dyna = 1
+        else:
+            opponent_can_dyna = 0
+        if (battle.opponent_can_mega_evolve):
+            opponent_can_mega = 1
+        else:
+            opponent_can_mega = 0
+        if (battle.opponent_can_z_move):
+            opponent_can_z = 1
+        else:
+            opponent_can_z = 0
         
         #battle info
         weather = battle.weather
 
 
-        # Final vector with 10 components
+        # Final vector
         return np.concatenate(
             [moves_base_power, moves_damage_multiplier, [remaining_mon_team, remaining_mon_opponent],
-            active_stats, active_types, active_can_dyna, active_can_mega, active_can_z, active_trapped,
-            opponent_active_stats, opponent_types, opponent_can_dyna, opponent_can_mega, opponent_can_z,
-            weather
+            [active_can_dyna], [active_can_mega], [active_can_z], [active_trapped],
+            [opponent_can_dyna], [opponent_can_mega], [opponent_can_z]
             ]
         )
 
     def compute_reward(self, battle) -> float:
         return self.reward_computing_helper(
-            battle,
-            fainted_value=2,
-            hp_value=1,
-            victory_value=30,
+            battle, fainted_value=2, hp_value=1, victory_value=30
         )
-    
-def dqn_training(player, dqn, nb_steps):
-    dqn.fit(player, nb_steps=nb_steps)
 
-    # This call will finished eventual unfinshed battles before returning
-    player.complete_current_battle()
+# for self play
+# class TrainedRLPlayer(Player):
+
+#     def getThisPlayer(self):
+#         return self
+
+#     def __init__(self, player, model, *args, **kwargs):
+#         Player.__init__(self, *args, **kwargs)
+#         self.model = model
+#         self.opponent = player
+
+#     def choose_move(self, battle):
+#         state = self.opponent.embed_battle(battle)
+#         predictions = self.model.predict([state])[0]
+#         action = np.argmax(predictions)
+#         return self.opponent._action_to_move(action, battle)
 
 env_player = SimpleRLPlayer(battle_format="gen8randombattle")
 
-# Output dimension
-n_action = len(env_player.action_space)
+model = PPO('MlpPolicy', env_player, clip_range=0.2, verbose=2)
 
-model = Sequential()
-model.add(Dense(128, activation="elu", input_shape=(1, 10,)))
-
-# Our embedding have shape (1, 10), which affects our hidden layer dimension and output dimension
-# Flattening resolve potential issues that would arise otherwise
-model.add(Flatten())
-model.add(Dense(64, activation="elu"))
-model.add(Dense(n_action, activation="linear"))
-
-model.summary(
-    line_length=None,
-    positions=None,
-    print_fn=None,
-)
-
-graph = tf.compat.v1.get_default_graph()
-
-memory = SequentialMemory(limit=10000, window_length=1)
-
-# Simple epsilon greedy
-policy = LinearAnnealedPolicy(
-    EpsGreedyQPolicy(),
-    attr="eps",
-    value_max=1.0,
-    value_min=0.05,
-    value_test=0,
-    nb_steps=10000,
-)
-
-# Defining our DQN
-dqn = DQNAgent(
-    model=model,
-    nb_actions=22,
-    policy=policy,
-    memory=memory,
-    nb_steps_warmup=1000,
-    gamma=0.5,
-    target_model_update=1,
-    delta_clip=0.01,
-    enable_double_dqn=True,
-)
-
-dqn.compile(Adam(learning_rate=0.001), metrics=["mae"])
+def training_function(player):
+    model.learn(total_timesteps=100000)
 
 opponent = RandomPlayer(battle_format="gen8randombattle")
 second_opponent = MaxDamagePlayer(battle_format="gen8randombattle")
 
-# Training
-env_player.play_against(
-    env_algorithm=dqn_training,
-    opponent=second_opponent,
-    env_algorithm_kwargs={"dqn": dqn, "nb_steps": 10000},
-)
-
-def dqn_evaluation(player, dqn, nb_episodes):
-    # Reset battle statistics
+def dqn_evaluation(player):
     player.reset_battles()
-    dqn.test(player, nb_episodes=nb_episodes, visualize=False, verbose=False)
+    for _ in range(100):
+        done = False
+        obs = player.reset()
+        while not done:
+            action = model.predict(obs)[0]
+            obs, _, done, _ = player.step(action)
+    player.complete_current_battle()
 
     print(
         "DQN Evaluation: %d victories out of %d episodes"
-        % (player.n_won_battles, nb_episodes)
+        % (player.n_won_battles, 100)
     )
 
-# Evaluation
-print("Results against random player:")
+# Training
+print("Training:")
+env_player.play_against(
+    env_algorithm=training_function,
+    opponent=opponent,
+)
+
+#Evaluation
+print("\nResults against random player:")
 env_player.play_against(
     env_algorithm=dqn_evaluation,
     opponent=opponent,
-    env_algorithm_kwargs={"dqn": dqn, "nb_episodes": 100},
 )
 
 print("\nResults against max player:")
 env_player.play_against(
     env_algorithm=dqn_evaluation,
     opponent=second_opponent,
-    env_algorithm_kwargs={"dqn": dqn, "nb_episodes": 100},
 )
