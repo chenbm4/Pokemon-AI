@@ -15,7 +15,12 @@ from poke_env.player.random_player import RandomPlayer
 from pokebot import MaxDamagePlayer
 
 class SimpleRLPlayer(Gen8EnvSinglePlayer):
-    def embed_battle(self, battle):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.model = None
+
+    def embed_battle(battle):
         # -1 indicates that the move does not have a base power
         # or is not available
         moves_base_power = -np.ones(4)
@@ -46,6 +51,18 @@ class SimpleRLPlayer(Gen8EnvSinglePlayer):
             hp_value=1,
             victory_value=30,
         )
+        
+    def choose_move(self, battle):
+        state = SimpleRLPlayer.embed_battle(battle)
+        print(state)
+        predictions = self.model.predict(np.expand_dims(state, 0))[0]
+        print(predictions)
+        action = np.argmax(predictions)
+        print(action)
+        return self._action_to_move(action, battle)
+#        print(SimpleRLPlayer.action_space)
+#        return self.create_order(order)
+#        return self.choose_random_move(battle)
     
 def dqn_training(player, dqn, nb_steps):
     dqn.fit(player, nb_steps=nb_steps)
@@ -53,86 +70,94 @@ def dqn_training(player, dqn, nb_steps):
     # This call will finished eventual unfinshed battles before returning
     player.complete_current_battle()
 
-env_player = SimpleRLPlayer(battle_format="gen8randombattle")
 
-# Output dimension
-n_action = len(env_player.action_space)
+#If rlBot is called directly, instead of being imported
+if __name__ == "__main__":
 
-model = Sequential()
-model.add(Dense(128, activation="elu", input_shape=(1, 10,)))
+    env_player = SimpleRLPlayer(battle_format="gen8randombattle")
 
-# Our embedding have shape (1, 10), which affects our hidden layer dimension and output dimension
-# Flattening resolve potential issues that would arise otherwise
-model.add(Flatten())
-model.add(Dense(64, activation="elu"))
-model.add(Dense(n_action, activation="linear"))
+    # Output dimension
+    n_action = len(env_player.action_space)
 
-model.summary(
-    line_length=None,
-    positions=None,
-    print_fn=None,
-)
+    model = Sequential()
+    model.add(Dense(128, activation="elu", input_shape=(1, 10,)))
 
-graph = tf.compat.v1.get_default_graph()
+    # Our embedding have shape (1, 10), which affects our hidden layer dimension and output dimension
+    # Flattening resolve potential issues that would arise otherwise
+    model.add(Flatten())
+    model.add(Dense(64, activation="elu"))
+    model.add(Dense(n_action, activation="linear"))
 
-memory = SequentialMemory(limit=10000, window_length=1)
-
-# Simple epsilon greedy
-policy = LinearAnnealedPolicy(
-    EpsGreedyQPolicy(),
-    attr="eps",
-    value_max=1.0,
-    value_min=0.05,
-    value_test=0,
-    nb_steps=10000,
-)
-
-# Defining our DQN
-dqn = DQNAgent(
-    model=model,
-    nb_actions=22,
-    policy=policy,
-    memory=memory,
-    nb_steps_warmup=1000,
-    gamma=0.5,
-    target_model_update=1,
-    delta_clip=0.01,
-    enable_double_dqn=True,
-)
-
-dqn.compile(Adam(learning_rate=0.001), metrics=["mae"])
-
-opponent = RandomPlayer(battle_format="gen8randombattle")
-second_opponent = MaxDamagePlayer(battle_format="gen8randombattle")
-
-# Training
-env_player.play_against(
-    env_algorithm=dqn_training,
-    opponent=second_opponent,
-    env_algorithm_kwargs={"dqn": dqn, "nb_steps": 10000},
-)
-
-def dqn_evaluation(player, dqn, nb_episodes):
-    # Reset battle statistics
-    player.reset_battles()
-    dqn.test(player, nb_episodes=nb_episodes, visualize=False, verbose=False)
-
-    print(
-        "DQN Evaluation: %d victories out of %d episodes"
-        % (player.n_won_battles, nb_episodes)
+    model.summary(
+        line_length=None,
+        positions=None,
+        print_fn=None,
     )
 
-# Evaluation
-print("Results against random player:")
-env_player.play_against(
-    env_algorithm=dqn_evaluation,
-    opponent=opponent,
-    env_algorithm_kwargs={"dqn": dqn, "nb_episodes": 100},
-)
+    graph = tf.compat.v1.get_default_graph()
 
-print("\nResults against max player:")
-env_player.play_against(
-    env_algorithm=dqn_evaluation,
-    opponent=second_opponent,
-    env_algorithm_kwargs={"dqn": dqn, "nb_episodes": 100},
-)
+    memory = SequentialMemory(limit=10000, window_length=1)
+
+    # Simple epsilon greedy
+    policy = LinearAnnealedPolicy(
+        EpsGreedyQPolicy(),
+        attr="eps",
+        value_max=1.0,
+        value_min=0.05,
+        value_test=0,
+        nb_steps=10000,
+    )
+
+    # Defining our DQN
+    dqn = DQNAgent(
+        model=model,
+        nb_actions=22,
+        policy=policy,
+        memory=memory,
+        nb_steps_warmup=1000,
+        gamma=0.5,
+        target_model_update=1,
+        delta_clip=0.01,
+        enable_double_dqn=True,
+    )
+
+    dqn.compile(Adam(learning_rate=0.001), metrics=["mae"])
+
+    opponent = RandomPlayer(battle_format="gen8randombattle")
+    second_opponent = MaxDamagePlayer(battle_format="gen8randombattle")
+
+    # Training
+    env_player.play_against(
+        env_algorithm=dqn_training,
+        opponent=second_opponent,
+        env_algorithm_kwargs={"dqn": dqn, "nb_steps": 10000},
+    )
+
+    def dqn_evaluation(player, dqn, nb_episodes):
+        # Reset battle statistics
+        player.reset_battles()
+        dqn.test(player, nb_episodes=nb_episodes, visualize=False, verbose=False)
+
+        print(
+            "DQN Evaluation: %d victories out of %d episodes"
+            % (player.n_won_battles, nb_episodes)
+        )
+
+    # Evaluation
+    print("Results against random player:")
+    env_player.play_against(
+        env_algorithm=dqn_evaluation,
+        opponent=opponent,
+        env_algorithm_kwargs={"dqn": dqn, "nb_episodes": 100},
+    )
+    
+    print("\nResults against max player:")
+    env_player.play_against(
+        env_algorithm=dqn_evaluation,
+        opponent=second_opponent,
+        env_algorithm_kwargs={"dqn": dqn, "nb_episodes": 100},
+    )
+
+
+    model.save_weights('./')
+

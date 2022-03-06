@@ -4,7 +4,12 @@ import os
 from poke_env.player_configuration import PlayerConfiguration
 from poke_env.server_configuration import ShowdownServerConfiguration
 
+from poke_env.player.random_player import RandomPlayer
 from DamageCalculator import MaxDamagePlayer
+from rlBot import SimpleRLPlayer
+
+from tensorflow.python.keras.layers import Dense, Flatten
+from tensorflow.python.keras.models import Sequential
 
 
 # This is a simple helper function to handle user inputs forgivingly.
@@ -30,12 +35,12 @@ def input_options(options):
 #   what battle format
 #   what server
 # returns tuple of bot, accountinfo, team, format, server object
-# TODO move account information somewhere else for security
+# consider move account information somewhere else for security
 # could implement ini reading here
 def bot_selector():
 
-    bot_options = (RandomPlayer, MaxDamagePlayer)
-    bot_options_strings = ("RandomPlayer", "MaxDamagePlayer")
+    bot_options = (SimpleRLPlayer, RandomPlayer, MaxDamagePlayer)
+    bot_options_strings = ("Trained Bot", "Random Player", "MaxDamage Player")
     bot_index = input_options(bot_options_strings)
     bot = bot_options[bot_index]
     
@@ -58,6 +63,27 @@ def bot_selector():
     server = server_options[server_index]
 
     return (bot, account, team, bformat, server)
+    
+def load_model(player):
+    n_action = len(player.action_space)
+    model = Sequential()
+    model.add(Dense(128, activation="elu", input_shape=(1, 10,)))
+
+    # Our embedding have shape (1, 10), which affects our hidden layer dimension and output dimension
+    # Flattening resolve potential issues that would arise otherwise
+    model.add(Flatten())
+    model.add(Dense(64, activation="elu"))
+    model.add(Dense(n_action, activation="linear"))
+
+    model.load_weights('./')
+        
+    model.summary(
+        line_length=None,
+        positions=None,
+        print_fn=None,
+    )
+        
+    player.model = model
 
 async def main():
     selected = bot_selector()
@@ -69,6 +95,11 @@ async def main():
         server_configuration=selected[4],
     )
     print("Successfully Logged In")
+    
+    if selected[0] == SimpleRLPlayer:
+        load_model(player) 
+    
+    
     # Sending challenges to 'your_username'
     # Not working on official pokemon showdown servers
     # await player.send_challenges("", n_challenges=1)
@@ -81,9 +112,9 @@ async def main():
     # Accepting three challenges from 'your_username'
     # await player.accept_challenges('your_username', 3)
 
-    # Playing 5 games on the ladder
-    # UNTESTED
-    # await player.ladder(5)
+    # Playing 1 games on the ladder
+    # BUGGY
+   # await player.ladder(1)
 
     # Print the rating of the player and its opponent after each battle
     #for battle in player.battles.values():
