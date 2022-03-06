@@ -33,10 +33,33 @@ class SimpleRLPlayer(Gen8EnvSinglePlayer):
         remaining_mon_opponent = (
             len([mon for mon in battle.opponent_team.values() if mon.fainted]) / 6
         )
+        
+        #active pokemon battle info
+        active_stats = battle.active_pokemon.stats
+        active_types = battle.active_pokemon.types
+        active_can_dyna = battle.can_dynamax
+        active_can_mega = battle.can_mega_evolve
+        active_can_z = battle.can_z_move
+        active_trapped = battle.trapped
+
+        #opponent pokemon battle info
+        opponent_active_stats = battle.opponent_active_pokemon.base_stats
+        opponent_types = battle.oppoenent_active_pokemon.types
+        opponent_can_dyna = battle.opponent_can_dynamax
+        opponent_can_mega = battle.opponent_can_mega_evolve
+        opponent_can_z = battle.opponent_can_z_move
+        
+        #battle info
+        weather = battle.weather
+
 
         # Final vector with 10 components
         return np.concatenate(
-            [moves_base_power, moves_damage_multiplier, [remaining_mon_team, remaining_mon_opponent]]
+            [moves_base_power, moves_damage_multiplier, [remaining_mon_team, remaining_mon_opponent],
+            active_stats, active_types, active_can_dyna, active_can_mega, active_can_z, active_trapped,
+            opponent_active_stats, opponent_types, opponent_can_dyna, opponent_can_mega, opponent_can_z,
+            weather
+            ]
         )
 
     def compute_reward(self, battle) -> float:
