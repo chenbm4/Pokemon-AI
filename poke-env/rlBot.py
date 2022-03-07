@@ -15,8 +15,6 @@ from poke_env.utils import to_id_str
 
 from gym.spaces import Box, Discrete
 
-# from stable_baselines3.common.utils import linear_schedule
-
 # PPO dependencies
 from stable_baselines3 import PPO, DQN
 from stable_baselines3.common import results_plotter
@@ -41,7 +39,7 @@ class State(enum.Enum):
     Complex = 1
 
 TIMESTEPS = 300000
-STATE = State.Complex
+STATE = State.Simple
 OPPONENT = Opponent.MaxDamage
 ALGORITHM = Algorithm.PPO
 
