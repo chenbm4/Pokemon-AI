@@ -1,17 +1,11 @@
-import pandas as pd
-from abc import ABC
-from typing import List
-from typing import Tuple
+import numpy as np
 
-from poke_env.data import POKEDEX
-from poke_env.data import MOVES
 from poke_env.environment.effect import Effect
 from poke_env.environment.status import Status
 from poke_env.environment.field import Field
 from poke_env.environment.weather import Weather
 from poke_env.environment.pokemon_type import PokemonType
 from poke_env.environment.move import EmptyMove
-from poke_env.environment.pokemon import Pokemon
 from poke_env.utils import to_id_str
 
 def MoveModel(feature_list, move, abilities, moves, boosts) -> None:
@@ -386,3 +380,25 @@ def GameModel(feature_list, pokemons, battle, abilities, moves, boosts) -> None:
     # print(dbg_count)
     # if (mon_counter > 6):
     #     exit()
+
+def SimpleGameModel(battle):
+    moves_base_power = -np.ones(4)
+    moves_dmg_multiplier = np.ones(4)
+    for i, move in enumerate(battle.available_moves):
+        moves_base_power[i] = move.base_power / 100 # Simple rescaling to facilitate learning
+        if move.type:
+            moves_dmg_multiplier[i] = move.type.damage_multiplier(
+                battle.opponent_active_pokemon.type_1,
+                battle.opponent_active_pokemon.type_2,
+            )
+
+    # We count how many pokemons have not fainted in each team
+    remaining_mon_team = len([mon for mon in battle.team.values() if mon.fainted]) / 6
+    remaining_mon_opponent = (
+        len([mon for mon in battle.opponent_team.values() if mon.fainted]) / 6
+    )
+
+    # Final vector with 10 components
+    return np.concatenate(
+        [moves_base_power, moves_dmg_multiplier, [remaining_mon_team, remaining_mon_opponent]]
+    )
