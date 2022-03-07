@@ -1,10 +1,7 @@
 import numpy as np
 import os
 import pandas as pd
-
-import optuna
-from optuna.pruners import MedianPruner
-from optuna.samplers import TPESampler
+import enum
 
 import matplotlib.pyplot as plt
 
@@ -16,11 +13,7 @@ from poke_env.data import POKEDEX
 from poke_env.data import MOVES
 from poke_env.utils import to_id_str
 
-import gym
 from gym.spaces import Box, Discrete
-from typing import Any, Dict
-import torch
-from torch import nn as nn
 
 # from stable_baselines3.common.utils import linear_schedule
 
@@ -30,24 +23,27 @@ from stable_baselines3.common import results_plotter
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.results_plotter import load_results, ts2xy, plot_results
 from stable_baselines3.common.callbacks import BaseCallback
-from stable_baselines3.common.callbacks import EvalCallback
 
 from poke_env.player.random_player import RandomPlayer
 from pokebot import MaxDamagePlayer
 from BattleState import GameModel, SimpleGameModel
 
-N_TRIALS = 100
-N_STARTUP_TRIALS = 5
-N_EVALUATIONS = 2
-N_TIMESTEPS = int(2e4)
-EVAL_FREQ = int(N_TIMESTEPS / N_EVALUATIONS)
-N_EVAL_EPISODES = 3
+class Algorithm(enum.Enum):
+    DQN = 0
+    PPO = 1
 
-# ENV_ID = "PokemonEnv"
+class Opponent(enum.Enum):
+    Random = 0
+    MaxDamage = 1
 
-DEFAULT_HYPERPARAMS = {
-    "policy": "MlpPolicy"
-}
+class State(enum.Enum):
+    Simple = 0
+    Complex = 1
+
+TIMESTEPS = 300000
+STATE = State.Complex
+OPPONENT = Opponent.MaxDamage
+ALGORITHM = Algorithm.PPO
 
 # load pokedex
 df = pd.DataFrame.from_dict(POKEDEX).T
@@ -75,7 +71,10 @@ log_dir = "tmp/"
 os.makedirs(log_dir, exist_ok=True)
 
 class SimpleRLPlayer(Gen8EnvSinglePlayer):
-    observation_space = Box(low=0, high=2, shape=(10,))
+    if STATE == State.Simple:
+        observation_space = Box(low=0, high=2, shape=(10,))
+    elif STATE == State.Complex:
+        observation_space = Box(low=0, high=255, shape=(1769,))
     action_space = Discrete(22)
 
     def getThisPlayer(self):
@@ -85,53 +84,18 @@ class SimpleRLPlayer(Gen8EnvSinglePlayer):
         Gen8EnvSinglePlayer.__init__(self)
 
     def embed_battle(self, battle):
-        feature_list = []
-
-        # GameModel(feature_list, pokemons, battle, abilities, moves, boosts)
-        return SimpleGameModel(battle)
-    
-        # array = np.array(feature_list)
-        # return array
+        if STATE == State.Simple:
+            return SimpleGameModel(battle)
+        elif STATE == State.Complex:
+            feature_list = []
+            GameModel(feature_list, pokemons, battle, abilities, moves, boosts)
+            array = np.array(feature_list)
+            return array
 
     def compute_reward(self, battle) -> float:
         return self.reward_computing_helper(
             battle, fainted_value=2, hp_value=1, victory_value=30
         )
-
-class TrialEvalCallback(EvalCallback):
-    """Callback used for evaluating and reporting a trial."""
-
-    def __init__(
-        self,
-        eval_env: gym.Env,
-        trial: optuna.Trial,
-        n_eval_episodes: int = 5,
-        eval_freq: int = 10000,
-        deterministic: bool = True,
-        verbose: int = 0,
-    ):
-
-        super().__init__(
-            eval_env=eval_env,
-            n_eval_episodes=n_eval_episodes,
-            eval_freq=eval_freq,
-            deterministic=deterministic,
-            verbose=verbose,
-        )
-        self.trial = trial
-        self.eval_idx = 0
-        self.is_pruned = False
-
-    def _on_step(self) -> bool:
-        if self.eval_freq > 0 and self.n_calls % self.eval_freq == 0:
-            super()._on_step()
-            self.eval_idx += 1
-            self.trial.report(self.last_mean_reward, self.eval_idx)
-            # Prune trial if need
-            if self.trial.should_prune():
-                self.is_pruned = True
-                return False
-        return True
 
 class SaveOnBestTrainingRewardCallback(BaseCallback):
     """
@@ -147,13 +111,13 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
         super(SaveOnBestTrainingRewardCallback, self).__init__(verbose)
         self.check_freq = check_freq
         self.log_dir = log_dir
-        self.save_path = os.path.join(log_dir, 'simple_DQN_random_100K')
+        self.save_path = os.path.join(log_dir, f"{STATE.name}_{ALGORITHM.name}_{OPPONENT.name}_{str(TIMESTEPS)}")
         self.best_mean_reward = -np.inf
 
     def _init_callback(self) -> None:
         # Create folder if needed
         if self.save_path is not None:
-            os.makedirs(self.save_path, exist_ok=True)
+            os.makedirs(self.save_path+"_images", exist_ok=True)
 
     def _on_step(self) -> bool:
         if self.n_calls % self.check_freq == 0:
@@ -172,23 +136,28 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
                   self.best_mean_reward = mean_reward
                   # Example for saving best model
                   if self.verbose > 0:
-                    print(f"Saving new best model to simple_DQN_random_100K")
-                  self.model.save('simple_DQN_random_100K')
+                    print(f"Saving new best model to {self.save_path}")
+                  self.model.save(self.save_path)
 
         return True
 
 env_player = SimpleRLPlayer(battle_format="gen8randombattle")
 env_player = Monitor(env_player, log_dir)
-model = DQN("MlpPolicy", env_player, verbose=0)
+if ALGORITHM == Algorithm.DQN:
+    model = DQN("MlpPolicy", env_player, verbose=0)
+elif ALGORITHM == Algorithm.PPO:
+    model = PPO("MlpPolicy", env_player, verbose=0)
 
 def training_function(player):
         callback = SaveOnBestTrainingRewardCallback(check_freq=1000, log_dir=log_dir)
-        model.learn(total_timesteps=100000, callback=callback)
+        model.learn(total_timesteps=TIMESTEPS, callback=callback)
 
-opponent = RandomPlayer(battle_format="gen8randombattle")
-second_opponent = MaxDamagePlayer(battle_format="gen8randombattle")
+if OPPONENT == Opponent.Random:
+    opponent = RandomPlayer(battle_format="gen8randombattle")
+elif OPPONENT == Opponent.MaxDamage:
+    opponent = MaxDamagePlayer(battle_format="gen8randombattle")
 
-def dqn_evaluation(player):
+def evaluation(player):
     player.reset_battles()
     for _ in range(100):
         done = False
@@ -199,7 +168,7 @@ def dqn_evaluation(player):
     player.complete_current_battle()
 
     print(
-        "DQN Evaluation: %d victories out of %d episodes"
+        "Evaluation: %d victories out of %d episodes"
         % (player.n_won_battles, 100)
     )
 
@@ -211,20 +180,23 @@ env_player.play_against(
 )
 print("Training Complete!")
 
-model.load("simple_DQN_random_100K")
+model.load(os.path.join(log_dir, f"{STATE.name}_{ALGORITHM.name}_{OPPONENT.name}_{str(TIMESTEPS)}"))
 
-plot_results([log_dir], 100000, results_plotter.X_TIMESTEPS, "DQN Pokemon Showdown vs Random (Simple)")
+plot_results([log_dir], TIMESTEPS, results_plotter.X_TIMESTEPS, f"{ALGORITHM.name} Pokemon Showdown vs {OPPONENT.name} {STATE.name}")
 plt.show()
+
+opponent = RandomPlayer(battle_format="gen8randombattle")
+second_opponent = MaxDamagePlayer(battle_format="gen8randombattle")
 
 #Evaluation
 print("\nResults against random player:")
 env_player.play_against(
-    env_algorithm=dqn_evaluation,
+    env_algorithm=evaluation,
     opponent=opponent,
 )
 
 print("\nResults against max player:")
 env_player.play_against(
-    env_algorithm=dqn_evaluation,
+    env_algorithm=evaluation,
     opponent=second_opponent,
 )

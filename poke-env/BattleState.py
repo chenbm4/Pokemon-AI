@@ -181,7 +181,7 @@ def MoveModel(feature_list, move, abilities, moves, boosts) -> None:
         else:
             feature_list.append(0)
 
-def PokemonModel(feature_list, pokemon, abilities, moves, boosts, myTeam) -> None:
+def PokemonModel(feature_list, pokemon, battle, abilities, moves, boosts, myTeam) -> None:
 
     #one hot encoded known abilities
     pkmn_ability = pokemon.ability
@@ -278,9 +278,9 @@ def PokemonModel(feature_list, pokemon, abilities, moves, boosts, myTeam) -> Non
             feature_list.append(0)
 
     if myTeam:
-        pkmn_moves = pokemon.moves
+        pkmn_moves = battle.available_moves
         move_counter = 0
-        for move in pkmn_moves.values():
+        for move in pkmn_moves:
             MoveModel(feature_list, move, abilities, moves, boosts)
             move_counter += 1
 
@@ -332,7 +332,7 @@ def GameModel(feature_list, pokemons, battle, abilities, moves, boosts) -> None:
         else:
             feature_list.append(0)
 
-    PokemonModel(feature_list, battle.active_pokemon, abilities, moves, boosts, True)  
+    PokemonModel(feature_list, battle.active_pokemon, battle, abilities, moves, boosts, True)  
 
     for pokemon in battle.team.values():
         if not pokemon.active:
@@ -357,7 +357,7 @@ def GameModel(feature_list, pokemons, battle, abilities, moves, boosts) -> None:
                     feature_list.append(0)
 
     opp_pkmn = battle.opponent_active_pokemon
-    PokemonModel(feature_list, opp_pkmn, abilities, moves, boosts, False)
+    PokemonModel(feature_list, opp_pkmn, battle, abilities, moves, boosts, False)
 
     remaining_mon_opponent = (
         len([mon for mon in battle.opponent_team.values() if not mon.fainted]) / 6
