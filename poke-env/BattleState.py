@@ -173,6 +173,13 @@ def MoveModel(feature_list, move, abilities, moves, boosts) -> None:
         else:
             feature_list.append(0)
 
+    move_type = move.type
+    for type in PokemonType:
+        if move_status_eff and (move_status_eff == status):
+            feature_list.append(1)
+        else:
+            feature_list.append(0)
+    
     move_weather = move.weather
     for weather in Weather:
         if move_weather and (move_weather == weather):
@@ -320,6 +327,7 @@ def PokemonModel(feature_list, pokemon, abilities, moves, boosts, exists) -> Non
         move_counter += 1
         MoveModel(feature_list, EmptyMove("unknown_move"), abilities, moves, boosts) # insert unknown move
     
+    # print(move_counter)
     if move_counter > 4:
         print(move_counter)
         exit()
@@ -363,19 +371,23 @@ def GameModel(feature_list, pokemons, battle, abilities, moves, boosts) -> None:
             feature_list.append(battle_fields[field])
         else:
             feature_list.append(0)
-        
+
+    dbg_count = 0    
     for pokemon in battle.team.values():
+        dbg_count += 1
         PokemonModel(feature_list, pokemon, abilities, moves, boosts, True)
 
     mon_counter = 0
     for pokemon in battle.opponent_team.values():
+        dbg_count += 1
         mon_counter += 1
         PokemonModel(feature_list, pokemon, abilities, moves, boosts, True)
     
     while mon_counter < 6:
+        dbg_count += 1
         mon_counter += 1
         PokemonModel(feature_list, Pokemon(), abilities, moves, boosts, False)
     
+    # print(dbg_count)
     if (mon_counter > 6):
-        print(mon_counter)
         exit()
