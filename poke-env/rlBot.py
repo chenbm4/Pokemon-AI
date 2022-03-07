@@ -142,7 +142,7 @@ log_dir = "tmp/"
 os.makedirs(log_dir, exist_ok=True)
 
 class SimpleRLPlayer(Gen8EnvSinglePlayer):
-    observation_space = Box(low=0, high=255, shape=(871946,))
+    observation_space = Box(low=0, high=255, shape=(1769,))
     action_space = Discrete(22)
 
     def getThisPlayer(self):
@@ -161,7 +161,7 @@ class SimpleRLPlayer(Gen8EnvSinglePlayer):
 
     def compute_reward(self, battle) -> float:
         return self.reward_computing_helper(
-            battle, fainted_value=2, hp_value=1, victory_value=30
+            battle, fainted_value=1, status_value=0.25, hp_value=0.5, victory_value=30
         )
 
 # for self play
@@ -216,167 +216,168 @@ class TrialEvalCallback(EvalCallback):
                 return False
         return True
 
-# class SaveOnBestTrainingRewardCallback(BaseCallback):
-#     """
-#     Callback for saving a model (the check is done every ``check_freq`` steps)
-#     based on the training reward (in practice, we recommend using ``EvalCallback``).
+class SaveOnBestTrainingRewardCallback(BaseCallback):
+    """
+    Callback for saving a model (the check is done every ``check_freq`` steps)
+    based on the training reward (in practice, we recommend using ``EvalCallback``).
 
-#     :param check_freq:
-#     :param log_dir: Path to the folder where the model will be saved.
-#       It must contains the file created by the ``Monitor`` wrapper.
-#     :param verbose: Verbosity level.
-#     """
-#     def __init__(self, check_freq: int, log_dir: str, verbose: int = 1):
-#         super(SaveOnBestTrainingRewardCallback, self).__init__(verbose)
-#         self.check_freq = check_freq
-#         self.log_dir = log_dir
-#         self.save_path = os.path.join(log_dir, 'best_model')
-#         self.best_mean_reward = -np.inf
+    :param check_freq:
+    :param log_dir: Path to the folder where the model will be saved.
+      It must contains the file created by the ``Monitor`` wrapper.
+    :param verbose: Verbosity level.
+    """
+    def __init__(self, check_freq: int, log_dir: str, verbose: int = 1):
+        super(SaveOnBestTrainingRewardCallback, self).__init__(verbose)
+        self.check_freq = check_freq
+        self.log_dir = log_dir
+        self.save_path = os.path.join(log_dir, 'best_model_10M')
+        self.best_mean_reward = -np.inf
 
-#     def _init_callback(self) -> None:
-#         # Create folder if needed
-#         if self.save_path is not None:
-#             os.makedirs(self.save_path, exist_ok=True)
+    def _init_callback(self) -> None:
+        # Create folder if needed
+        if self.save_path is not None:
+            os.makedirs(self.save_path, exist_ok=True)
 
-#     def _on_step(self) -> bool:
-#         if self.n_calls % self.check_freq == 0:
+    def _on_step(self) -> bool:
+        if self.n_calls % self.check_freq == 0:
 
-#           # Retrieve training reward
-#           x, y = ts2xy(load_results(self.log_dir), 'timesteps')
-#           if len(x) > 0:
-#               # Mean training reward over the last 100 episodes
-#               mean_reward = np.mean(y[-100:])
-#               if self.verbose > 0:
-#                 print(f"Num timesteps: {self.num_timesteps}")
-#                 print(f"Best mean reward: {self.best_mean_reward:.2f} - Last mean reward per episode: {mean_reward:.2f}")
+          # Retrieve training reward
+          x, y = ts2xy(load_results(self.log_dir), 'timesteps')
+          if len(x) > 0:
+              # Mean training reward over the last 100 episodes
+              mean_reward = np.mean(y[-100:])
+              if self.verbose > 0:
+                print(f"Num timesteps: {self.num_timesteps}")
+                print(f"Best mean reward: {self.best_mean_reward:.2f} - Last mean reward per episode: {mean_reward:.2f}")
 
-#               # New best model, you could save the agent here
-#               if mean_reward > self.best_mean_reward:
-#                   self.best_mean_reward = mean_reward
-#                   # Example for saving best model
-#                   if self.verbose > 0:
-#                     print(f"Saving new best model to {self.save_path}")
-#                   self.model.save(self.save_path)
+              # New best model, you could save the agent here
+              if mean_reward > self.best_mean_reward:
+                  self.best_mean_reward = mean_reward
+                  # Example for saving best model
+                  if self.verbose > 0:
+                    print(f"Saving new best model to best_model_10M")
+                  self.model.save('best_model_10M')
 
-#         return True
+        return True
 
-def objective(trial: optuna.Trial) -> float:
+# def objective(trial: optuna.Trial) -> float:
 
-    kwargs = DEFAULT_HYPERPARAMS.copy()
-    kwargs.update(sample_ppo_params(trial))
-    env_player = SimpleRLPlayer(battle_format="gen8randombattle")
-    env_player = Monitor(env_player, log_dir)
-    model = PPO(env=env_player, **kwargs)
+#     kwargs = DEFAULT_HYPERPARAMS.copy()
+#     kwargs.update(sample_ppo_params(trial))
+#     env_player = SimpleRLPlayer(battle_format="gen8randombattle")
+#     env_player = Monitor(env_player, log_dir)
+#     model = PPO(env=env_player, **kwargs)
 
-    eval_callback = TrialEvalCallback(
-        env_player, trial, n_eval_episodes=N_EVAL_EPISODES, eval_freq=EVAL_FREQ, deterministic=True
-    )
+#     eval_callback = TrialEvalCallback(
+#         env_player, trial, n_eval_episodes=N_EVAL_EPISODES, eval_freq=EVAL_FREQ, deterministic=True
+#     )
 
-    def training_function(player):
-        model.learn(total_timesteps=10000, callback=eval_callback)
+#     def training_function(player):
+#         model.learn(total_timesteps=10000, callback=eval_callback)
     
-    opponent = RandomPlayer(battle_format="gen8randombattle")
-    nan_encountered = False
-    try:
-        env_player.play_against(
-            env_algorithm=training_function,
-            opponent=opponent,
-        )
-    except AssertionError as e:
-        print(e)
-        nan_encountered = True
-    finally:
-        model.env.close()
-        env_player.close()
+#     opponent = RandomPlayer(battle_format="gen8randombattle")
+#     nan_encountered = False
+#     try:
+#         env_player.play_against(
+#             env_algorithm=training_function,
+#             opponent=opponent,
+#         )
+#     except AssertionError as e:
+#         print(e)
+#         nan_encountered = True
+#     finally:
+#         model.env.close()
+#         env_player.close()
     
-    if nan_encountered:
-        return float("nan")
+#     if nan_encountered:
+#         return float("nan")
     
-    if eval_callback.is_pruned:
-        raise optuna.exceptions.TrialPruned()
+#     if eval_callback.is_pruned:
+#         raise optuna.exceptions.TrialPruned()
 
-    return eval_callback.last_mean_reward
+#     return eval_callback.last_mean_reward
 
-if __name__ == "__main__":
-    # Set pytorch num threads to 1 for faster training
-    torch.set_num_threads(1)
+# if __name__ == "__main__":
+#     # Set pytorch num threads to 1 for faster training
+#     torch.set_num_threads(1)
 
-    sampler = TPESampler(n_startup_trials=N_STARTUP_TRIALS)
-    # Do not prune before 1/3 of the max budget is used
-    pruner = MedianPruner(n_startup_trials=N_STARTUP_TRIALS, n_warmup_steps=N_EVALUATIONS // 3)
+#     sampler = TPESampler(n_startup_trials=N_STARTUP_TRIALS)
+#     # Do not prune before 1/3 of the max budget is used
+#     pruner = MedianPruner(n_startup_trials=N_STARTUP_TRIALS, n_warmup_steps=N_EVALUATIONS // 3)
 
-    study = optuna.create_study(sampler=sampler, pruner=pruner, direction="maximize")
-    try:
-        study.optimize(objective, n_trials=N_TRIALS, timeout=600)
-    except KeyboardInterrupt:
-        pass
+#     study = optuna.create_study(sampler=sampler, pruner=pruner, direction="maximize")
+#     try:
+#         study.optimize(objective, n_trials=N_TRIALS, timeout=600)
+#     except KeyboardInterrupt:
+#         pass
 
-    print("Number of finished trials: ", len(study.trials))
+#     print("Number of finished trials: ", len(study.trials))
 
-    print("Best trial:")
-    trial = study.best_trial
+#     print("Best trial:")
+#     trial = study.best_trial
 
-    print("  Value: ", trial.value)
+#     print("  Value: ", trial.value)
 
-    print("  Params: ")
-    for key, value in trial.params.items():
-        print("    {}: {}".format(key, value))
+#     print("  Params: ")
+#     for key, value in trial.params.items():
+#         print("    {}: {}".format(key, value))
 
-    print("  User attrs:")
-    for key, value in trial.user_attrs.items():
-        print("    {}: {}".format(key, value))
+#     print("  User attrs:")
+#     for key, value in trial.user_attrs.items():
+#         print("    {}: {}".format(key, value))
         
-# Create log dir
+# # Create log dir
 # log_dir = "tmp/"
 # os.makedirs(log_dir, exist_ok=True)
 
-# env_player = SimpleRLPlayer(battle_format="gen8randombattle")
-# env_player = Monitor(env_player, log_dir)
-# model = PPO("MlpPolicy", env_player, batch_size=256, verbose=0)
+env_player = SimpleRLPlayer(battle_format="gen8randombattle")
+env_player = Monitor(env_player, log_dir)
+model = PPO("MlpPolicy", env_player, verbose=0)
 
-# def training_function(player):
-#         callback = SaveOnBestTrainingRewardCallback(check_freq=100, log_dir=log_dir)
-#         model.learn(total_timesteps=10000, callback=callback)
+def training_function(player):
+        callback = SaveOnBestTrainingRewardCallback(check_freq=1000, log_dir=log_dir)
+        model.learn(total_timesteps=5000000, callback=callback)
 
-# opponent = RandomPlayer(battle_format="gen8randombattle")
-# second_opponent = MaxDamagePlayer(battle_format="gen8randombattle")
+opponent = RandomPlayer(battle_format="gen8randombattle")
+second_opponent = MaxDamagePlayer(battle_format="gen8randombattle")
 
-# def dqn_evaluation(player):
-#     player.reset_battles()
-#     for _ in range(100):
-#         done = False
-#         obs = player.reset()
-#         while not done:
-#             action = model.predict(obs)[0]
-#             obs, _, done, _ = player.step(action)
-#     player.complete_current_battle()
+def dqn_evaluation(player):
+    player.reset_battles()
+    for _ in range(100):
+        done = False
+        obs = player.reset()
+        while not done:
+            action = model.predict(obs)[0]
+            obs, _, done, _ = player.step(action)
+    player.complete_current_battle()
 
-#     print(
-#         "DQN Evaluation: %d victories out of %d episodes"
-#         % (player.n_won_battles, 100)
-#     )
+    print(
+        "DQN Evaluation: %d victories out of %d episodes"
+        % (player.n_won_battles, 100)
+    )
 
-# # Training
-# print("Training:")
-# env_player.play_against(
-#     env_algorithm=training_function,
-#     opponent=opponent,
-# )
+# Training
+print("Training:")
+env_player.play_against(
+    env_algorithm=training_function,
+    opponent=opponent,
+)
+print("Training Complete!")
 
-# model.save("PPO_10M")
+model.load("best_model_5M")
 
-# plot_results([log_dir], 10000000, results_plotter.X_TIMESTEPS, "TD3 LunarLander")
-# plt.show()
+plot_results([log_dir], 5000000, results_plotter.X_TIMESTEPS, "PPO Pokemon Showdown vs Random")
+plt.show()
 
-# #Evaluation
-# print("\nResults against random player:")
-# env_player.play_against(
-#     env_algorithm=dqn_evaluation,
-#     opponent=opponent,
-# )
+#Evaluation
+print("\nResults against random player:")
+env_player.play_against(
+    env_algorithm=dqn_evaluation,
+    opponent=opponent,
+)
 
-# print("\nResults against max player:")
-# env_player.play_against(
-#     env_algorithm=dqn_evaluation,
-#     opponent=second_opponent,
-# )
+print("\nResults against max player:")
+env_player.play_against(
+    env_algorithm=dqn_evaluation,
+    opponent=second_opponent,
+)

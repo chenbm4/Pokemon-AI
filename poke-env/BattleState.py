@@ -23,7 +23,7 @@ def MoveModel(feature_list, move, abilities, moves, boosts) -> None:
 
     move_base_pwr = move.base_power
     if move_base_pwr:
-        feature_list.append(move_base_pwr)
+        feature_list.append(move_base_pwr / 100)
     else:
         feature_list.append(0)
 
@@ -60,7 +60,7 @@ def MoveModel(feature_list, move, abilities, moves, boosts) -> None:
 
     move_current_pp = move.current_pp
     if move_current_pp:
-        feature_list.append(move_current_pp)
+        feature_list.append(move_current_pp / 10)
     else:
         feature_list.append(0)
 
@@ -70,18 +70,18 @@ def MoveModel(feature_list, move, abilities, moves, boosts) -> None:
     else:
         feature_list.append(0)
     
-    move_defphysical = 0
-    move_defspecial = 0
-    move_defstatus = 0
-    if move.defensive_category == 1:
-        move_defphysical = 1
-    elif move.defensive_category == 2:
-        move_defspecial = 1
-    else:
-        move_defstatus = 1
-    feature_list.append(move_defphysical)
-    feature_list.append(move_defspecial)
-    feature_list.append(move_defstatus)
+    # move_defphysical = 0
+    # move_defspecial = 0
+    # move_defstatus = 0
+    # if move.defensive_category == 1:
+    #     move_defphysical = 1
+    # elif move.defensive_category == 2:
+    #     move_defspecial = 1
+    # else:
+    #     move_defstatus = 1
+    # feature_list.append(move_defphysical)
+    # feature_list.append(move_defspecial)
+    # feature_list.append(move_defstatus)
 
     move_exp_hits = move.expected_hits
     if move_exp_hits:
@@ -100,30 +100,30 @@ def MoveModel(feature_list, move, abilities, moves, boosts) -> None:
     else:
         feature_list.append(0)
     
-    move_ignore_abil = 0
-    if move.ignore_ability:
-        move_ignore_abil = 1
-    feature_list.append(move_ignore_abil)
+    # move_ignore_abil = 0
+    # if move.ignore_ability:
+    #     move_ignore_abil = 1
+    # feature_list.append(move_ignore_abil)
 
-    move_ignore_def = 0
-    if move.ignore_defensive:
-        move_ignore_def = 1
-    feature_list.append(move_ignore_def)
+    # move_ignore_def = 0
+    # if move.ignore_defensive:
+    #     move_ignore_def = 1
+    # feature_list.append(move_ignore_def)
 
-    move_ignore_evas = 0
-    if move.ignore_evasion:
-        move_ignore_evas = 1
-    feature_list.append(move_ignore_evas)
+    # move_ignore_evas = 0
+    # if move.ignore_evasion:
+    #     move_ignore_evas = 1
+    # feature_list.append(move_ignore_evas)
 
-    move_ignore_immune = 0
-    if move.ignore_immunity:
-        move_ignore_immune = 1
-    feature_list.append(move_ignore_immune)
+    # move_ignore_immune = 0
+    # if move.ignore_immunity:
+    #     move_ignore_immune = 1
+    # feature_list.append(move_ignore_immune)
 
-    move_is_prot_counter = 0
-    if move.is_protect_counter:
-        move_is_prot_counter = 1
-    feature_list.append(move_is_prot_counter)
+    # move_is_prot_counter = 0
+    # if move.is_protect_counter:
+    #     move_is_prot_counter = 1
+    # feature_list.append(move_is_prot_counter)
 
     move_is_prot_move = 0
     if move.is_protect_move:
@@ -175,7 +175,7 @@ def MoveModel(feature_list, move, abilities, moves, boosts) -> None:
 
     move_type = move.type
     for type in PokemonType:
-        if move_status_eff and (move_status_eff == status):
+        if move_type and (move_type == type):
             feature_list.append(1)
         else:
             feature_list.append(0)
@@ -187,21 +187,7 @@ def MoveModel(feature_list, move, abilities, moves, boosts) -> None:
         else:
             feature_list.append(0)
 
-def PokemonModel(feature_list, pokemon, abilities, moves, boosts, exists) -> None:
-    pkmn_revealed = 0
-    if pokemon.fainted:
-        pkmn_fainted = 1
-    feature_list.append(pkmn_revealed)
-
-    pkmn_fainted = 0
-    if pokemon.fainted:
-        pkmn_fainted = 1
-    feature_list.append(pkmn_fainted)
-
-    pkmn_active = 0
-    if pokemon.active:
-        pkmn_active = 1
-    feature_list.append(pkmn_active)
+def PokemonModel(feature_list, pokemon, abilities, moves, boosts, myTeam) -> None:
 
     #one hot encoded known abilities
     pkmn_ability = pokemon.ability
@@ -213,36 +199,31 @@ def PokemonModel(feature_list, pokemon, abilities, moves, boosts, exists) -> Non
         else:
             feature_list.append(0)
 
-        if exists:
-            pkmn_poss_abilities = pokemon.possible_abilities
-            for ability in abilities:
-                found_poss_ability = False
-                for poss_ability in pkmn_poss_abilities:
-                    if to_id_str(poss_ability) == ability:
-                        found_poss_ability = True
-                        feature_list.append(1)
-                if not found_poss_ability:
-                    feature_list.append(0)
-        else:
-            for ability in abilities:
+    if not myTeam:
+        pkmn_poss_abilities = pokemon.possible_abilities
+        for ability in abilities:
+            found_poss_ability = False
+            for poss_ability in pkmn_poss_abilities:
+                if to_id_str(poss_ability) == ability:
+                    found_poss_ability = True
+                    feature_list.append(1)
+            if not found_poss_ability:
                 feature_list.append(0)
 
-    if exists:
+    if myTeam:
         pkmn_stats = pokemon.base_stats
         pkmn_hp = pkmn_stats["hp"]
-        feature_list.append(pkmn_hp)
+        feature_list.append(pkmn_hp/100)
         pkmn_atk = pkmn_stats["atk"]
-        feature_list.append(pkmn_atk)
+        feature_list.append(pkmn_atk/100)
         pkmn_def = pkmn_stats["def"]
-        feature_list.append(pkmn_def)
+        feature_list.append(pkmn_def/100)
         pkmn_spa = pkmn_stats["spa"]
-        feature_list.append(pkmn_spa)
+        feature_list.append(pkmn_spa/100)
         pkmn_spd = pkmn_stats["spd"]
-        feature_list.append(pkmn_spd)
+        feature_list.append(pkmn_spd/100)
         pkmn_spe = pkmn_stats["spe"]
-        feature_list.append(pkmn_spe)
-    else:
-        feature_list.extend([0,0,0,0,0,0])
+        feature_list.append(pkmn_spe/100)
     
     pkmn_boosts = pokemon.boosts
     for attr in boosts:
@@ -253,9 +234,9 @@ def PokemonModel(feature_list, pokemon, abilities, moves, boosts, exists) -> Non
     
     pkmn_current_hp = pokemon.current_hp
     if pkmn_current_hp:
-        feature_list.append(pkmn_current_hp)
+        feature_list.append(pkmn_current_hp/100)
     else:
-        feature_list.append(100)
+        feature_list.append(1)
 
     pkmn_effects = pokemon.effects # OHE and process
     for effect in Effect:
@@ -263,21 +244,11 @@ def PokemonModel(feature_list, pokemon, abilities, moves, boosts, exists) -> Non
             feature_list.append(pkmn_effects[effect])
         else:
             feature_list.append(0)
-    
-    pkmn_first_turn = 0
-    if pokemon.first_turn:
-        pkmn_first_turn = 1
-    feature_list.append(pkmn_first_turn)
 
     pkmn_is_dyn = 0
     if pokemon.is_dynamaxed:
         pkmn_is_dyn = 1
     feature_list.append(pkmn_is_dyn)
-
-    pkmn_must_recharge = 0
-    if pokemon.must_recharge:
-        pkmn_must_recharge = 1
-    feature_list.append(pkmn_must_recharge)
 
     pkmn_preparing = 0
     if pokemon.preparing:
@@ -300,37 +271,32 @@ def PokemonModel(feature_list, pokemon, abilities, moves, boosts, exists) -> Non
         else:
             feature_list.append(0)
 
-    if exists:
-        pkmn_type1 = pokemon.type_1
-        pkmn_type2 = pokemon.type_2
-        for type in PokemonType:
-            if pkmn_type1 == type:
-                feature_list.append(1)
-            else:
-                feature_list.append(0)
-            if pkmn_type2 == type:
-                feature_list.append(1)
-            else:
-                feature_list.append(0)
-    else:
-        for type in PokemonType:
+    pkmn_type1 = pokemon.type_1
+    pkmn_type2 = pokemon.type_2
+    for type in PokemonType:
+        if pkmn_type1 == type:
+            feature_list.append(1)
+        else:
             feature_list.append(0)
+        if pkmn_type2 == type:
+            feature_list.append(1)
+        else:
             feature_list.append(0)
 
-    pkmn_moves = pokemon.moves
-    move_counter = 0
-    for move in pkmn_moves.values():
-        MoveModel(feature_list, move, abilities, moves, boosts)
-        move_counter += 1
+    if myTeam:
+        pkmn_moves = pokemon.moves
+        move_counter = 0
+        for move in pkmn_moves.values():
+            MoveModel(feature_list, move, abilities, moves, boosts)
+            move_counter += 1
 
-    while move_counter < 4:
-        move_counter += 1
-        MoveModel(feature_list, EmptyMove("unknown_move"), abilities, moves, boosts) # insert unknown move
-    
-    # print(move_counter)
-    if move_counter > 4:
-        print(move_counter)
-        exit()
+        while move_counter < 4:
+            move_counter += 1
+            MoveModel(feature_list, EmptyMove("unknown_move"), abilities, moves, boosts) # insert unknown move
+        
+        if move_counter > 4:
+            print(move_counter)
+            exit()
 
 def GameModel(feature_list, pokemons, battle, abilities, moves, boosts) -> None:
     player_can_dyna = 0
@@ -372,22 +338,51 @@ def GameModel(feature_list, pokemons, battle, abilities, moves, boosts) -> None:
         else:
             feature_list.append(0)
 
-    dbg_count = 0    
-    for pokemon in battle.team.values():
-        dbg_count += 1
-        PokemonModel(feature_list, pokemon, abilities, moves, boosts, True)
+    PokemonModel(feature_list, battle.active_pokemon, abilities, moves, boosts, True)  
 
-    mon_counter = 0
-    for pokemon in battle.opponent_team.values():
-        dbg_count += 1
-        mon_counter += 1
-        PokemonModel(feature_list, pokemon, abilities, moves, boosts, True)
+    for pokemon in battle.team.values():
+        if not pokemon.active:
+            pkmn_fainted = 0
+            if pokemon.fainted:
+                pkmn_fainted = 1
+            feature_list.append(pkmn_fainted)
+
+            pkmn_current_hp = pokemon.current_hp
+            feature_list.append(pkmn_current_hp)
+
+            pkmn_type1 = pokemon.type_1
+            pkmn_type2 = pokemon.type_2
+            for type in PokemonType:
+                if pkmn_type1 == type:
+                    feature_list.append(1)
+                else:
+                    feature_list.append(0)
+                if pkmn_type2 == type:
+                    feature_list.append(1)
+                else:
+                    feature_list.append(0)
+
+    opp_pkmn = battle.opponent_active_pokemon
+    PokemonModel(feature_list, opp_pkmn, abilities, moves, boosts, False)
+
+    remaining_mon_opponent = (
+        len([mon for mon in battle.opponent_team.values() if not mon.fainted]) / 6
+    )
+
+    feature_list.append(remaining_mon_opponent)
+
+
+    # mon_counter = 0
+    # for pokemon in battle.opponent_team.values():
+    #     dbg_count += 1
+    #     mon_counter += 1
+    #     PokemonModel(feature_list, pokemon, abilities, moves, boosts, True)
     
-    while mon_counter < 6:
-        dbg_count += 1
-        mon_counter += 1
-        PokemonModel(feature_list, Pokemon(), abilities, moves, boosts, False)
+    # while mon_counter < 6:
+    #     dbg_count += 1
+    #     mon_counter += 1
+    #     PokemonModel(feature_list, Pokemon(), abilities, moves, boosts, False)
     
     # print(dbg_count)
-    if (mon_counter > 6):
-        exit()
+    # if (mon_counter > 6):
+    #     exit()
