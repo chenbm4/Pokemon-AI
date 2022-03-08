@@ -40,6 +40,10 @@ STATE = State.Simple
 OPPONENT = Opponent.MaxDamage
 ALGORITHM = Algorithm.PPO
 
+# Create log dir
+LOG_DIR = "tmp/"
+os.makedirs(LOG_DIR, exist_ok=True)
+
 class SimpleRLPlayer(Gen8EnvSinglePlayer):
     if STATE == State.Simple:
         observation_space = Box(low=0, high=2, shape=(10,))
@@ -73,15 +77,15 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
     based on the training reward (in practice, we recommend using ``EvalCallback``).
 
     :param check_freq:
-    :param log_dir: Path to the folder where the model will be saved.
+    :param LOG_DIR: Path to the folder where the model will be saved.
       It must contains the file created by the ``Monitor`` wrapper.
     :param verbose: Verbosity level.
     """
-    def __init__(self, check_freq: int, log_dir: str, verbose: int = 1):
+    def __init__(self, check_freq: int, LOG_DIR: str, verbose: int = 1):
         super(SaveOnBestTrainingRewardCallback, self).__init__(verbose)
         self.check_freq = check_freq
-        self.log_dir = log_dir
-        self.save_path = os.path.join(log_dir, f"{STATE.name}_{ALGORITHM.name}_{OPPONENT.name}_{str(TIMESTEPS)}")
+        self.LOG_DIR = LOG_DIR
+        self.save_path = os.path.join(LOG_DIR, f"{STATE.name}_{ALGORITHM.name}_{OPPONENT.name}_{str(TIMESTEPS)}")
         self.best_mean_reward = -np.inf
 
     def _init_callback(self) -> None:
@@ -93,7 +97,7 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
         if self.n_calls % self.check_freq == 0:
 
           # Retrieve training reward
-          x, y = ts2xy(load_results(self.log_dir), 'timesteps')
+          x, y = ts2xy(load_results(self.LOG_DIR), 'timesteps')
           if len(x) > 0:
               # Mean training reward over the last 100 episodes
               mean_reward = np.mean(y[-100:])
@@ -133,19 +137,15 @@ if __name__ == "__main__":
     boosts = list(set([key for item in boosts for key in item]))
     # print(boosts)
 
-    # Create log dir
-    log_dir = "tmp/"
-    os.makedirs(log_dir, exist_ok=True)
-
     env_player = SimpleRLPlayer(battle_format="gen8randombattle")
-    env_player = Monitor(env_player, log_dir)
+    env_player = Monitor(env_player, LOG_DIR)
     if ALGORITHM == Algorithm.DQN:
         model = DQN("MlpPolicy", env_player, verbose=0)
     elif ALGORITHM == Algorithm.PPO:
         model = PPO("MlpPolicy", env_player, verbose=0)
 
     def training_function(player):
-            callback = SaveOnBestTrainingRewardCallback(check_freq=1000, log_dir=log_dir)
+            callback = SaveOnBestTrainingRewardCallback(check_freq=1000, log_dir=LOG_DIR)
             model.learn(total_timesteps=TIMESTEPS, callback=callback)
 
     if OPPONENT == Opponent.Random:
@@ -176,9 +176,9 @@ if __name__ == "__main__":
     )
     print("Training Complete!")
 
-    model.load(os.path.join(log_dir, f"{STATE.name}_{ALGORITHM.name}_{OPPONENT.name}_{str(TIMESTEPS)}"))
+    model.load(os.path.join(LOG_DIR, f"{STATE.name}_{ALGORITHM.name}_{OPPONENT.name}_{str(TIMESTEPS)}"))
 
-    plot_results([log_dir], TIMESTEPS, results_plotter.X_TIMESTEPS, f"{ALGORITHM.name} Pokemon Showdown vs {OPPONENT.name} {STATE.name}")
+    plot_results([LOG_DIR], TIMESTEPS, results_plotter.X_TIMESTEPS, f"{ALGORITHM.name} Pokemon Showdown vs {OPPONENT.name} {STATE.name}")
     plt.show()
 
     opponent = RandomPlayer(battle_format="gen8randombattle")
