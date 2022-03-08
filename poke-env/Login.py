@@ -6,11 +6,23 @@ from poke_env.server_configuration import ShowdownServerConfiguration
 
 from poke_env.player.random_player import RandomPlayer
 from DamageCalculator import MaxDamagePlayer
+import MaxdamageplayerTest
 
 import rlBot
 from rlBot import SimpleRLPlayer
 from stable_baselines3 import PPO, DQN
 
+def SimpleRLWrapper(*args, **kwargs):
+    rlBot.STATE = rlBot.State.Simple
+    player = SimpleRLPlayer(*args, **kwargs)
+    load_model(player, "Simple")
+    return player
+
+def ComplexRLWrapper(*args, **kwargs):
+    rlBot.STATE = rlBot.State.Complex
+    player = SimpleRLPlayer(*args, **kwargs)
+    load_model(player, "Complex")
+    return player
 
 # This is a simple helper function to handle user inputs forgivingly.
 # This takes an iterable and returns an index that the user has chosen.
@@ -39,8 +51,8 @@ def input_options(options):
 # could implement ini reading here
 def bot_selector():
 
-    bot_options = (SimpleRLPlayer, RandomPlayer, MaxDamagePlayer)
-    bot_options_strings = ("Trained Bot", "Random Player", "MaxDamage Player")
+    bot_options = (SimpleRLWrapper, ComplexRLWrapper, RandomPlayer, MaxDamagePlayer, MaxdamageplayerTest.MaxDamagePlayer)
+    bot_options_strings = ("Simple Trained Bot", "Complex Trained Bot", "Random Player", "DamageCalc Player", "MaxDamage Player")
     bot_index = input_options(bot_options_strings)
     bot = bot_options[bot_index]
     
@@ -64,11 +76,11 @@ def bot_selector():
 
     return (bot, account, team, bformat, server)
     
-def load_model(player):
+def load_model(player, state):
     if rlBot.ALGORITHM == rlBot.Algorithm.DQN:
-        model = DQN.load(os.path.join(rlBot.LOG_DIR, f"{rlBot.STATE.name}_{rlBot.ALGORITHM.name}_{rlBot.OPPONENT.name}_{str(rlBot.TIMESTEPS)}"))
+        model = DQN.load(os.path.join(rlBot.LOG_DIR, f"{state}_{rlBot.ALGORITHM.name}_{rlBot.OPPONENT.name}_{str(rlBot.TIMESTEPS)}"))
     elif rlBot.ALGORITHM == rlBot.Algorithm.PPO:
-        model = PPO.load(os.path.join(rlBot.LOG_DIR, f"{rlBot.STATE.name}_{rlBot.ALGORITHM.name}_{rlBot.OPPONENT.name}_{str(rlBot.TIMESTEPS)}"))
+        model = PPO.load(os.path.join(rlBot.LOG_DIR, f"{state}_{rlBot.ALGORITHM.name}_{rlBot.OPPONENT.name}_{str(rlBot.TIMESTEPS)}"))
     player.model = model
 
 async def main():
@@ -81,10 +93,6 @@ async def main():
         server_configuration=selected[4],
     )
     print("Successfully Logged In")
-    
-    if selected[0] == SimpleRLPlayer:
-        load_model(player) 
-    
     
     # Sending challenges to 'your_username'
     # Not working on official pokemon showdown servers
