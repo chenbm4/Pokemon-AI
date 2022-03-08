@@ -10,3 +10,4 @@
 		if hasattr(model.output, '__len__') and len(model.output) > 1:
 	to
 		if hasattr(model.output, '__len__') and len([model.output.shape.dims.__len__()]) > 1:
+10. Download stable-baselines3 using "pip3.8 install stable-baselines3"

@@ -40,31 +40,6 @@ STATE = State.Simple
 OPPONENT = Opponent.MaxDamage
 ALGORITHM = Algorithm.PPO
 
-# load pokedex
-df = pd.DataFrame.from_dict(POKEDEX).T
-df["num"] = df["num"].astype(int)
-df.drop(df[df["num"] <= 0].index, inplace=True)
-pokemons = df.index.tolist() + ["unknown_pokemon"]
-
-# list of possible abilities
-abilities = set(
-    [to_id_str(y) for x in df["abilities"].tolist() for y in x.values()]
-)
-abilities = list(abilities) + ["unknown_ability"]
-
-# load moves
-df = pd.DataFrame.from_dict(MOVES).T
-moves = df.index.tolist() + ["unknown_move"]
-
-# list of possible boosts
-boosts = df["boosts"][~df["boosts"].isnull()].tolist()
-boosts = list(set([key for item in boosts for key in item]))
-# print(boosts)
-
-# Create log dir
-log_dir = "tmp/"
-os.makedirs(log_dir, exist_ok=True)
-
 class SimpleRLPlayer(Gen8EnvSinglePlayer):
     if STATE == State.Simple:
         observation_space = Box(low=0, high=2, shape=(10,))
@@ -136,62 +111,88 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
 
         return True
 
-env_player = SimpleRLPlayer(battle_format="gen8randombattle")
-env_player = Monitor(env_player, log_dir)
-if ALGORITHM == Algorithm.DQN:
-    model = DQN("MlpPolicy", env_player, verbose=0)
-elif ALGORITHM == Algorithm.PPO:
-    model = PPO("MlpPolicy", env_player, verbose=0)
+if __name__ == "__main__":
+    # load pokedex
+    df = pd.DataFrame.from_dict(POKEDEX).T
+    df["num"] = df["num"].astype(int)
+    df.drop(df[df["num"] <= 0].index, inplace=True)
+    pokemons = df.index.tolist() + ["unknown_pokemon"]
 
-def training_function(player):
-        callback = SaveOnBestTrainingRewardCallback(check_freq=1000, log_dir=log_dir)
-        model.learn(total_timesteps=TIMESTEPS, callback=callback)
+    # list of possible abilities
+    abilities = set(
+        [to_id_str(y) for x in df["abilities"].tolist() for y in x.values()]
+    )
+    abilities = list(abilities) + ["unknown_ability"]
 
-if OPPONENT == Opponent.Random:
+    # load moves
+    df = pd.DataFrame.from_dict(MOVES).T
+    moves = df.index.tolist() + ["unknown_move"]
+
+    # list of possible boosts
+    boosts = df["boosts"][~df["boosts"].isnull()].tolist()
+    boosts = list(set([key for item in boosts for key in item]))
+    # print(boosts)
+
+    # Create log dir
+    log_dir = "tmp/"
+    os.makedirs(log_dir, exist_ok=True)
+
+    env_player = SimpleRLPlayer(battle_format="gen8randombattle")
+    env_player = Monitor(env_player, log_dir)
+    if ALGORITHM == Algorithm.DQN:
+        model = DQN("MlpPolicy", env_player, verbose=0)
+    elif ALGORITHM == Algorithm.PPO:
+        model = PPO("MlpPolicy", env_player, verbose=0)
+
+    def training_function(player):
+            callback = SaveOnBestTrainingRewardCallback(check_freq=1000, log_dir=log_dir)
+            model.learn(total_timesteps=TIMESTEPS, callback=callback)
+
+    if OPPONENT == Opponent.Random:
+        opponent = RandomPlayer(battle_format="gen8randombattle")
+    elif OPPONENT == Opponent.MaxDamage:
+        opponent = MaxDamagePlayer(battle_format="gen8randombattle")
+
+    def evaluation(player):
+        player.reset_battles()
+        for _ in range(100):
+            done = False
+            obs = player.reset()
+            while not done:
+                action = model.predict(obs)[0]
+                obs, _, done, _ = player.step(action)
+        player.complete_current_battle()
+
+        print(
+            "Evaluation: %d victories out of %d episodes"
+            % (player.n_won_battles, 100)
+        )
+
+    # Training
+    print("Training:")
+    env_player.play_against(
+        env_algorithm=training_function,
+        opponent=opponent,
+    )
+    print("Training Complete!")
+
+    model.load(os.path.join(log_dir, f"{STATE.name}_{ALGORITHM.name}_{OPPONENT.name}_{str(TIMESTEPS)}"))
+
+    plot_results([log_dir], TIMESTEPS, results_plotter.X_TIMESTEPS, f"{ALGORITHM.name} Pokemon Showdown vs {OPPONENT.name} {STATE.name}")
+    plt.show()
+
     opponent = RandomPlayer(battle_format="gen8randombattle")
-elif OPPONENT == Opponent.MaxDamage:
-    opponent = MaxDamagePlayer(battle_format="gen8randombattle")
+    second_opponent = MaxDamagePlayer(battle_format="gen8randombattle")
 
-def evaluation(player):
-    player.reset_battles()
-    for _ in range(100):
-        done = False
-        obs = player.reset()
-        while not done:
-            action = model.predict(obs)[0]
-            obs, _, done, _ = player.step(action)
-    player.complete_current_battle()
-
-    print(
-        "Evaluation: %d victories out of %d episodes"
-        % (player.n_won_battles, 100)
+    #Evaluation
+    print("\nResults against random player:")
+    env_player.play_against(
+        env_algorithm=evaluation,
+        opponent=opponent,
     )
 
-# Training
-print("Training:")
-env_player.play_against(
-    env_algorithm=training_function,
-    opponent=opponent,
-)
-print("Training Complete!")
-
-model.load(os.path.join(log_dir, f"{STATE.name}_{ALGORITHM.name}_{OPPONENT.name}_{str(TIMESTEPS)}"))
-
-plot_results([log_dir], TIMESTEPS, results_plotter.X_TIMESTEPS, f"{ALGORITHM.name} Pokemon Showdown vs {OPPONENT.name} {STATE.name}")
-plt.show()
-
-opponent = RandomPlayer(battle_format="gen8randombattle")
-second_opponent = MaxDamagePlayer(battle_format="gen8randombattle")
-
-#Evaluation
-print("\nResults against random player:")
-env_player.play_against(
-    env_algorithm=evaluation,
-    opponent=opponent,
-)
-
-print("\nResults against max player:")
-env_player.play_against(
-    env_algorithm=evaluation,
-    opponent=second_opponent,
-)
+    print("\nResults against max player:")
+    env_player.play_against(
+        env_algorithm=evaluation,
+        opponent=second_opponent,
+    )
