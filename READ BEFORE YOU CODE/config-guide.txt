@@ -1,7 +1,7 @@
 1. Clone Pokemon-AI repository into IDE of your choice
 2. For best results, use the embedded terminal in your IDE
 3. Install Python 3.8 (can use Microsoft Store)
-4. Download tensorflow using "pip3.8 install tensorflow==2.4.0"
+4. Download tensorflow using "pip3.8 install tensorflow==2.4.1"
 5. Download poke-env using "pip3.8 install poke-env"
 6. Download keras-rl2 using "pip3.8 install --no-deps keras-rl2==1.0.3"
 7. Change terminal directory into poke-env folder
