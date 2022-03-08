@@ -6,6 +6,7 @@ import enum
 import matplotlib.pyplot as plt
 
 from poke_env.player.env_player import Gen8EnvSinglePlayer
+from poke_env.player.env_player import EnvPlayer
 from poke_env.data import POKEDEX
 from poke_env.data import MOVES
 from poke_env.utils import to_id_str
@@ -20,7 +21,7 @@ from stable_baselines3.common.results_plotter import load_results, ts2xy, plot_r
 from stable_baselines3.common.callbacks import BaseCallback
 
 from poke_env.player.random_player import RandomPlayer
-from pokebot import MaxDamagePlayer
+from pokebot import MaxDamagePlayer # can change to DamageCalculator
 from BattleState import GameModel, SimpleGameModel
 
 class Algorithm(enum.Enum):
@@ -36,9 +37,29 @@ class State(enum.Enum):
     Complex = 1
 
 TIMESTEPS = 300000
-STATE = State.Simple
+STATE = State.Complex
 OPPONENT = Opponent.MaxDamage
 ALGORITHM = Algorithm.PPO
+
+# load pokedex
+df = pd.DataFrame.from_dict(POKEDEX).T
+df["num"] = df["num"].astype(int)
+df.drop(df[df["num"] <= 0].index, inplace=True)
+
+# list of possible abilities
+ABILITIES_LIST = set(
+    [to_id_str(y) for x in df["abilities"].tolist() for y in x.values()]
+)
+ABILITIES_LIST = list(ABILITIES_LIST) + ["unknown_ability"]
+
+# load moves
+df = pd.DataFrame.from_dict(MOVES).T
+MOVES_LIST = df.index.tolist() + ["unknown_move"]
+
+# list of possible boosts
+BOOSTS_LIST = df["boosts"][~df["boosts"].isnull()].tolist()
+BOOSTS_LIST = list(set([key for item in BOOSTS_LIST for key in item]))
+# print(boosts)
 
 # Create log dir
 LOG_DIR = "tmp/"
@@ -63,7 +84,7 @@ class SimpleRLPlayer(Gen8EnvSinglePlayer):
             return SimpleGameModel(battle)
         elif STATE == State.Complex:
             feature_list = []
-            GameModel(feature_list, pokemons, battle, abilities, moves, boosts)
+            GameModel(feature_list, battle, ABILITIES_LIST, MOVES_LIST, BOOSTS_LIST)
             array = np.array(feature_list)
             return array
 
@@ -74,12 +95,20 @@ class SimpleRLPlayer(Gen8EnvSinglePlayer):
         
     # this is only run when login.py is run
     def choose_move(self, battle):
-        state = self.embed_battle(battle)
-        print(state)
-        predictions = self.model.predict(np.expand_dims(state, 0))[0] 
-        #WARNING: may have different behavior baased on model type
-        print(predictions)
-        return self._action_to_move(predictions[0], battle)
+        if self.model == None:
+            if battle not in self._observations or battle not in self._actions:
+                self._init_battle(battle)
+            self._observations[battle].put(self.embed_battle(battle))
+            action = self._actions[battle].get()
+
+            return self._action_to_move(action, battle)
+        else:
+            state = self.embed_battle(battle)
+            print(state)
+            predictions = self.model.predict(np.expand_dims(state, 0))[0] 
+            #WARNING: may have different behavior baased on model type
+            print(predictions)
+            return self._action_to_move(predictions[0], battle)
 
 class SaveOnBestTrainingRewardCallback(BaseCallback):
     """
@@ -126,27 +155,6 @@ class SaveOnBestTrainingRewardCallback(BaseCallback):
         return True
 
 if __name__ == "__main__":
-    # load pokedex
-    df = pd.DataFrame.from_dict(POKEDEX).T
-    df["num"] = df["num"].astype(int)
-    df.drop(df[df["num"] <= 0].index, inplace=True)
-    pokemons = df.index.tolist() + ["unknown_pokemon"]
-
-    # list of possible abilities
-    abilities = set(
-        [to_id_str(y) for x in df["abilities"].tolist() for y in x.values()]
-    )
-    abilities = list(abilities) + ["unknown_ability"]
-
-    # load moves
-    df = pd.DataFrame.from_dict(MOVES).T
-    moves = df.index.tolist() + ["unknown_move"]
-
-    # list of possible boosts
-    boosts = df["boosts"][~df["boosts"].isnull()].tolist()
-    boosts = list(set([key for item in boosts for key in item]))
-    # print(boosts)
-
     env_player = SimpleRLPlayer(battle_format="gen8randombattle")
     env_player = Monitor(env_player, LOG_DIR)
     if ALGORITHM == Algorithm.DQN:
@@ -155,7 +163,7 @@ if __name__ == "__main__":
         model = PPO("MlpPolicy", env_player, verbose=0)
 
     def training_function(player):
-            callback = SaveOnBestTrainingRewardCallback(check_freq=1000, log_dir=LOG_DIR)
+            callback = SaveOnBestTrainingRewardCallback(check_freq=1000, LOG_DIR=LOG_DIR)
             model.learn(total_timesteps=TIMESTEPS, callback=callback)
 
     if OPPONENT == Opponent.Random:

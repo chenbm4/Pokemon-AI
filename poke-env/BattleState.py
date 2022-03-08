@@ -292,7 +292,7 @@ def PokemonModel(feature_list, pokemon, battle, abilities, moves, boosts, myTeam
             print(move_counter)
             exit()
 
-def GameModel(feature_list, pokemons, battle, abilities, moves, boosts) -> None:
+def GameModel(feature_list, battle, abilities, moves, boosts) -> None:
     player_can_dyna = 0
     if battle.can_dynamax:
         player_can_dyna = 1
