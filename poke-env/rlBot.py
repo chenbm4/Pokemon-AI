@@ -1,163 +1,200 @@
 import numpy as np
-import tensorflow as tf
+import os
+import pandas as pd
+import enum
+
+import matplotlib.pyplot as plt
+
+os.add_dll_directory("C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.6/bin")
+os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices'
 
 from poke_env.player.env_player import Gen8EnvSinglePlayer
+from poke_env.data import POKEDEX
+from poke_env.data import MOVES
+from poke_env.utils import to_id_str
 
-from tensorflow.python.keras.layers import Dense, Flatten
-from tensorflow.python.keras.models import Sequential
+from gym.spaces import Box, Discrete
 
-from rl.agents.dqn import DQNAgent
-from rl.memory import SequentialMemory
-from rl.policy import LinearAnnealedPolicy, EpsGreedyQPolicy
-from tensorflow.keras.optimizers import Adam
+# PPO dependencies
+from stable_baselines3 import PPO, DQN
+from stable_baselines3.common import results_plotter
+from stable_baselines3.common.monitor import Monitor
+from stable_baselines3.common.results_plotter import load_results, ts2xy, plot_results
+from stable_baselines3.common.callbacks import BaseCallback
 
 from poke_env.player.random_player import RandomPlayer
 from pokebot import MaxDamagePlayer
+from BattleState import GameModel, SimpleGameModel
+
+class Algorithm(enum.Enum):
+    DQN = 0
+    PPO = 1
+
+class Opponent(enum.Enum):
+    Random = 0
+    MaxDamage = 1
+
+class State(enum.Enum):
+    Simple = 0
+    Complex = 1
+
+TIMESTEPS = 300000
+STATE = State.Simple
+OPPONENT = Opponent.MaxDamage
+ALGORITHM = Algorithm.PPO
+
+# load pokedex
+df = pd.DataFrame.from_dict(POKEDEX).T
+df["num"] = df["num"].astype(int)
+df.drop(df[df["num"] <= 0].index, inplace=True)
+pokemons = df.index.tolist() + ["unknown_pokemon"]
+
+# list of possible abilities
+abilities = set(
+    [to_id_str(y) for x in df["abilities"].tolist() for y in x.values()]
+)
+abilities = list(abilities) + ["unknown_ability"]
+
+# load moves
+df = pd.DataFrame.from_dict(MOVES).T
+moves = df.index.tolist() + ["unknown_move"]
+
+# list of possible boosts
+boosts = df["boosts"][~df["boosts"].isnull()].tolist()
+boosts = list(set([key for item in boosts for key in item]))
+# print(boosts)
+
+# Create log dir
+log_dir = "tmp/"
+os.makedirs(log_dir, exist_ok=True)
 
 class SimpleRLPlayer(Gen8EnvSinglePlayer):
+    if STATE == State.Simple:
+        observation_space = Box(low=0, high=2, shape=(10,))
+    elif STATE == State.Complex:
+        observation_space = Box(low=0, high=255, shape=(1769,))
+    action_space = Discrete(22)
+
+    def getThisPlayer(self):
+        return self
 
     def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.model = None
+        Gen8EnvSinglePlayer.__init__(self)
 
-    def embed_battle(battle):
-        # -1 indicates that the move does not have a base power
-        # or is not available
-        moves_base_power = -np.ones(4)
-        moves_damage_multiplier = np.ones(4)
-        for i, move in enumerate(battle.available_moves):
-            moves_base_power[i] = move.base_power / 100 # rescaling to make learning easier
-            if move.type:
-                moves_damage_multiplier[i] = move.type.damage_multiplier(
-                    battle.opponent_active_pokemon.type_1,
-                    battle.opponent_active_pokemon.type_2,
-                )
-
-        # We count how many pokemons have not fainted in each team
-        remaining_mon_team = len([mon for mon in battle.team.values() if mon.fainted]) / 6
-        remaining_mon_opponent = (
-            len([mon for mon in battle.opponent_team.values() if mon.fainted]) / 6
-        )
-
-        # Final vector with 10 components
-        return np.concatenate(
-            [moves_base_power, moves_damage_multiplier, [remaining_mon_team, remaining_mon_opponent]]
-        )
+    def embed_battle(self, battle):
+        if STATE == State.Simple:
+            return SimpleGameModel(battle)
+        elif STATE == State.Complex:
+            feature_list = []
+            GameModel(feature_list, pokemons, battle, abilities, moves, boosts)
+            array = np.array(feature_list)
+            return array
 
     def compute_reward(self, battle) -> float:
         return self.reward_computing_helper(
-            battle,
-            fainted_value=2,
-            hp_value=1,
-            victory_value=30,
+            battle, fainted_value=2, hp_value=1, victory_value=30
         )
-        
-    def choose_move(self, battle):
-        state = SimpleRLPlayer.embed_battle(battle)
-        print(state)
-        predictions = self.model.predict(np.expand_dims(state, 0))[0]
-        print(predictions)
-        action = np.argmax(predictions)
-        print(action)
-        return self._action_to_move(action, battle)
-#        print(SimpleRLPlayer.action_space)
-#        return self.create_order(order)
-#        return self.choose_random_move(battle)
-    
-def dqn_training(player, dqn, nb_steps):
-    dqn.fit(player, nb_steps=nb_steps)
 
-    # This call will finished eventual unfinshed battles before returning
+class SaveOnBestTrainingRewardCallback(BaseCallback):
+    """
+    Callback for saving a model (the check is done every ``check_freq`` steps)
+    based on the training reward (in practice, we recommend using ``EvalCallback``).
+
+    :param check_freq:
+    :param log_dir: Path to the folder where the model will be saved.
+      It must contains the file created by the ``Monitor`` wrapper.
+    :param verbose: Verbosity level.
+    """
+    def __init__(self, check_freq: int, log_dir: str, verbose: int = 1):
+        super(SaveOnBestTrainingRewardCallback, self).__init__(verbose)
+        self.check_freq = check_freq
+        self.log_dir = log_dir
+        self.save_path = os.path.join(log_dir, f"{STATE.name}_{ALGORITHM.name}_{OPPONENT.name}_{str(TIMESTEPS)}")
+        self.best_mean_reward = -np.inf
+
+    def _init_callback(self) -> None:
+        # Create folder if needed
+        if self.save_path is not None:
+            os.makedirs(self.save_path+"_images", exist_ok=True)
+
+    def _on_step(self) -> bool:
+        if self.n_calls % self.check_freq == 0:
+
+          # Retrieve training reward
+          x, y = ts2xy(load_results(self.log_dir), 'timesteps')
+          if len(x) > 0:
+              # Mean training reward over the last 100 episodes
+              mean_reward = np.mean(y[-100:])
+              if self.verbose > 0:
+                print(f"Num timesteps: {self.num_timesteps}")
+                print(f"Best mean reward: {self.best_mean_reward:.2f} - Last mean reward per episode: {mean_reward:.2f}")
+
+              # New best model, you could save the agent here
+              if mean_reward > self.best_mean_reward:
+                  self.best_mean_reward = mean_reward
+                  # Example for saving best model
+                  if self.verbose > 0:
+                    print(f"Saving new best model to {self.save_path}")
+                  self.model.save(self.save_path)
+
+        return True
+
+env_player = SimpleRLPlayer(battle_format="gen8randombattle")
+env_player = Monitor(env_player, log_dir)
+if ALGORITHM == Algorithm.DQN:
+    model = DQN("MlpPolicy", env_player, verbose=0)
+elif ALGORITHM == Algorithm.PPO:
+    model = PPO("MlpPolicy", env_player, verbose=0)
+
+def training_function(player):
+        callback = SaveOnBestTrainingRewardCallback(check_freq=1000, log_dir=log_dir)
+        model.learn(total_timesteps=TIMESTEPS, callback=callback)
+
+if OPPONENT == Opponent.Random:
+    opponent = RandomPlayer(battle_format="gen8randombattle")
+elif OPPONENT == Opponent.MaxDamage:
+    opponent = MaxDamagePlayer(battle_format="gen8randombattle")
+
+def evaluation(player):
+    player.reset_battles()
+    for _ in range(100):
+        done = False
+        obs = player.reset()
+        while not done:
+            action = model.predict(obs)[0]
+            obs, _, done, _ = player.step(action)
     player.complete_current_battle()
 
-
-#If rlBot is called directly, instead of being imported
-if __name__ == "__main__":
-
-    env_player = SimpleRLPlayer(battle_format="gen8randombattle")
-
-    # Output dimension
-    n_action = len(env_player.action_space)
-
-    model = Sequential()
-    model.add(Dense(128, activation="elu", input_shape=(1, 10,)))
-
-    # Our embedding have shape (1, 10), which affects our hidden layer dimension and output dimension
-    # Flattening resolve potential issues that would arise otherwise
-    model.add(Flatten())
-    model.add(Dense(64, activation="elu"))
-    model.add(Dense(n_action, activation="linear"))
-
-    model.summary(
-        line_length=None,
-        positions=None,
-        print_fn=None,
+    print(
+        "Evaluation: %d victories out of %d episodes"
+        % (player.n_won_battles, 100)
     )
 
-    graph = tf.compat.v1.get_default_graph()
+# Training
+print("Training:")
+env_player.play_against(
+    env_algorithm=training_function,
+    opponent=opponent,
+)
+print("Training Complete!")
 
-    memory = SequentialMemory(limit=10000, window_length=1)
+model.load(os.path.join(log_dir, f"{STATE.name}_{ALGORITHM.name}_{OPPONENT.name}_{str(TIMESTEPS)}"))
 
-    # Simple epsilon greedy
-    policy = LinearAnnealedPolicy(
-        EpsGreedyQPolicy(),
-        attr="eps",
-        value_max=1.0,
-        value_min=0.05,
-        value_test=0,
-        nb_steps=10000,
-    )
+plot_results([log_dir], TIMESTEPS, results_plotter.X_TIMESTEPS, f"{ALGORITHM.name} Pokemon Showdown vs {OPPONENT.name} {STATE.name}")
+plt.show()
 
-    # Defining our DQN
-    dqn = DQNAgent(
-        model=model,
-        nb_actions=22,
-        policy=policy,
-        memory=memory,
-        nb_steps_warmup=1000,
-        gamma=0.5,
-        target_model_update=1,
-        delta_clip=0.01,
-        enable_double_dqn=True,
-    )
+opponent = RandomPlayer(battle_format="gen8randombattle")
+second_opponent = MaxDamagePlayer(battle_format="gen8randombattle")
 
-    dqn.compile(Adam(learning_rate=0.001), metrics=["mae"])
+#Evaluation
+print("\nResults against random player:")
+env_player.play_against(
+    env_algorithm=evaluation,
+    opponent=opponent,
+)
 
-    opponent = RandomPlayer(battle_format="gen8randombattle")
-    second_opponent = MaxDamagePlayer(battle_format="gen8randombattle")
-
-    # Training
-    env_player.play_against(
-        env_algorithm=dqn_training,
-        opponent=second_opponent,
-        env_algorithm_kwargs={"dqn": dqn, "nb_steps": 10000},
-    )
-
-    def dqn_evaluation(player, dqn, nb_episodes):
-        # Reset battle statistics
-        player.reset_battles()
-        dqn.test(player, nb_episodes=nb_episodes, visualize=False, verbose=False)
-
-        print(
-            "DQN Evaluation: %d victories out of %d episodes"
-            % (player.n_won_battles, nb_episodes)
-        )
-
-    # Evaluation
-    print("Results against random player:")
-    env_player.play_against(
-        env_algorithm=dqn_evaluation,
-        opponent=opponent,
-        env_algorithm_kwargs={"dqn": dqn, "nb_episodes": 100},
-    )
-    
-    print("\nResults against max player:")
-    env_player.play_against(
-        env_algorithm=dqn_evaluation,
-        opponent=second_opponent,
-        env_algorithm_kwargs={"dqn": dqn, "nb_episodes": 100},
-    )
-
-
-    model.save_weights('./')
-
+print("\nResults against max player:")
+env_player.play_against(
+    env_algorithm=evaluation,
+    opponent=second_opponent,
+)
