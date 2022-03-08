@@ -55,7 +55,8 @@ class SimpleRLPlayer(Gen8EnvSinglePlayer):
         return self
 
     def __init__(self, *args, **kwargs):
-        Gen8EnvSinglePlayer.__init__(self)
+        self.model = None
+        Gen8EnvSinglePlayer.__init__(self, *args, **kwargs)
 
     def embed_battle(self, battle):
         if STATE == State.Simple:
@@ -70,6 +71,15 @@ class SimpleRLPlayer(Gen8EnvSinglePlayer):
         return self.reward_computing_helper(
             battle, fainted_value=2, hp_value=1, victory_value=30
         )
+        
+    # this is only run when login.py is run
+    def choose_move(self, battle):
+        state = self.embed_battle(battle)
+        print(state)
+        predictions = self.model.predict(np.expand_dims(state, 0))[0] 
+        #WARNING: may have different behavior baased on model type
+        print(predictions)
+        return self._action_to_move(predictions[0], battle)
 
 class SaveOnBestTrainingRewardCallback(BaseCallback):
     """

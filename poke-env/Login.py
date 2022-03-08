@@ -6,10 +6,10 @@ from poke_env.server_configuration import ShowdownServerConfiguration
 
 from poke_env.player.random_player import RandomPlayer
 from DamageCalculator import MaxDamagePlayer
-from rlBot import SimpleRLPlayer
 
-from tensorflow.python.keras.layers import Dense, Flatten
-from tensorflow.python.keras.models import Sequential
+import rlBot
+from rlBot import SimpleRLPlayer
+from stable_baselines3 import PPO, DQN
 
 
 # This is a simple helper function to handle user inputs forgivingly.
@@ -65,24 +65,10 @@ def bot_selector():
     return (bot, account, team, bformat, server)
     
 def load_model(player):
-    n_action = len(player.action_space)
-    model = Sequential()
-    model.add(Dense(128, activation="elu", input_shape=(1, 10,)))
-
-    # Our embedding have shape (1, 10), which affects our hidden layer dimension and output dimension
-    # Flattening resolve potential issues that would arise otherwise
-    model.add(Flatten())
-    model.add(Dense(64, activation="elu"))
-    model.add(Dense(n_action, activation="linear"))
-
-    model.load_weights('./')
-        
-    model.summary(
-        line_length=None,
-        positions=None,
-        print_fn=None,
-    )
-        
+    if rlBot.ALGORITHM == rlBot.Algorithm.DQN:
+        model = DQN.load(os.path.join(rlBot.LOG_DIR, f"{rlBot.STATE.name}_{rlBot.ALGORITHM.name}_{rlBot.OPPONENT.name}_{str(rlBot.TIMESTEPS)}"))
+    elif rlBot.ALGORITHM == rlBot.Algorithm.PPO:
+        model = PPO.load(os.path.join(rlBot.LOG_DIR, f"{rlBot.STATE.name}_{rlBot.ALGORITHM.name}_{rlBot.OPPONENT.name}_{str(rlBot.TIMESTEPS)}"))
     player.model = model
 
 async def main():
@@ -102,7 +88,7 @@ async def main():
     
     # Sending challenges to 'your_username'
     # Not working on official pokemon showdown servers
-    # await player.send_challenges("", n_challenges=1)
+    #await player.send_challenges("aqaaaaaaaaaaaaaaa", n_challenges=1)
 
     # Accepting one challenge from any user
     # send challenge to bot under 'find a user' button and type in bot's username
