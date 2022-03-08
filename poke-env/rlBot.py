@@ -5,9 +5,6 @@ import enum
 
 import matplotlib.pyplot as plt
 
-os.add_dll_directory("C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.6/bin")
-os.environ['TF_XLA_FLAGS'] = '--tf_xla_enable_xla_devices'
-
 from poke_env.player.env_player import Gen8EnvSinglePlayer
 from poke_env.data import POKEDEX
 from poke_env.data import MOVES
