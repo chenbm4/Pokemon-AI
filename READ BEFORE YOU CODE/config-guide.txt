@@ -4,8 +4,8 @@
 4. Download tensorflow using "pip3.8 install tensorflow==2.4.1"
 5. Download poke-env using "pip3.8 install poke-env"
 6. Download keras-rl2 using "pip3.8 install --no-deps keras-rl2==1.0.3"
-7. Change terminal directory into poke-env folder
-8. Download stable-baselines3 using "pip3.8 install stable-baselines3"
+7. Download stable-baselines3 using "pip3.8 install --no-deps stable-baselines3"
+8. Change terminal directory into poke-env folder
 9. Run python3.8 .\rlBot.py
 10. Ctrl-click the error in dqn.py to navigate to the dqn.py file, and change
 		if hasattr(model.output, '__len__') and len(model.output) > 1:
